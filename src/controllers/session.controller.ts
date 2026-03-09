@@ -14,14 +14,14 @@ function send(ws: WebSocket, message: ServerMessage): void {
  * Creates a dedicated GeminiService per connection so sessions are isolated.
  */
 export function handleSessionWebSocket(ws: WebSocket): void {
-  console.log('🔌 Client connected');
+  console.log('Client connected');
 
   const gemini = new GeminiService(config.GEMINI_API_KEY);
 
   // ── Wire Gemini callbacks → WebSocket ──────────────────────────────────
 
   gemini.onReady = () => {
-    console.log('✅ Gemini session ready');
+    console.log('Gemini session ready');
     send(ws, { type: 'session_ready' });
   };
 
@@ -91,7 +91,7 @@ export function handleSessionWebSocket(ws: WebSocket): void {
   // ── Teardown ────────────────────────────────────────────────────────────
 
   ws.on('close', () => {
-    console.log('🔌 Client disconnected');
+    console.log(' Client disconnected');
     gemini.disconnect();
   });
 
