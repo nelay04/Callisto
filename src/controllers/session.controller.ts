@@ -91,7 +91,7 @@ export function handleSessionWebSocket(ws: WebSocket): void {
   // ── Teardown ────────────────────────────────────────────────────────────
 
   ws.on('close', () => {
-    console.log(' Client disconnected');
+    console.log('Client disconnected');
     gemini.disconnect();
   });
 
