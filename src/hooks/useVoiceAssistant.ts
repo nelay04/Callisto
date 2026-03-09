@@ -11,6 +11,9 @@ interface VoiceAssistantState {
   transcripts: Turn[];
   inputVolume: number;
   outputVolume: number;
+  /** Spectral centroid 0–1: proxy for dominant pitch (higher = brighter/higher pitch). */
+  inputPitch: number;
+  outputPitch: number;
 }
 
 export function useVoiceAssistant() {
@@ -19,6 +22,8 @@ export function useVoiceAssistant() {
     transcripts: [],
     inputVolume: 0,
     outputVolume: 0,
+    inputPitch: 0,
+    outputPitch: 0,
   });
 
   // ── Refs (avoid stale closures in audio callbacks) ───────────────────────
@@ -38,6 +43,9 @@ export function useVoiceAssistant() {
   // Always-current reference to the message handler (avoids stale closure on ws.onmessage)
   const handleMessageRef = useRef<(raw: string) => void>(() => {});
 
+  // When true, the next transcript — even with the same role — starts a fresh turn
+  const forceFreshTurnRef = useRef(false);
+
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   const setConnectionState = useCallback((s: ConnectionState) => {
@@ -55,22 +63,28 @@ export function useVoiceAssistant() {
   const startVolumePolling = useCallback(() => {
     stopVolumePolling();
     volumeTimerRef.current = setInterval(() => {
-      let inVol = 0;
-      let outVol = 0;
+      let inVol = 0, outVol = 0, inPitch = 0, outPitch = 0;
 
       if (analyserInRef.current) {
         const buf = new Uint8Array(analyserInRef.current.frequencyBinCount);
         analyserInRef.current.getByteFrequencyData(buf);
-        inVol = buf.reduce((a, b) => a + b, 0) / buf.length / 255;
+        let total = 0, weighted = 0;
+        for (let i = 0; i < buf.length; i++) { total += buf[i]; weighted += i * buf[i]; }
+        inVol = total / buf.length / 255;
+        // Spectral centroid as pitch proxy; gate on minimum energy to avoid noise
+        inPitch = total > buf.length * 5 ? weighted / (total * buf.length) : 0;
       }
 
       if (analyserOutRef.current) {
         const buf = new Uint8Array(analyserOutRef.current.frequencyBinCount);
         analyserOutRef.current.getByteFrequencyData(buf);
-        outVol = buf.reduce((a, b) => a + b, 0) / buf.length / 255;
+        let total = 0, weighted = 0;
+        for (let i = 0; i < buf.length; i++) { total += buf[i]; weighted += i * buf[i]; }
+        outVol = total / buf.length / 255;
+        outPitch = total > buf.length * 5 ? weighted / (total * buf.length) : 0;
       }
 
-      setState((prev) => ({ ...prev, inputVolume: inVol, outputVolume: outVol }));
+      setState((prev) => ({ ...prev, inputVolume: inVol, outputVolume: outVol, inputPitch: inPitch, outputPitch: outPitch }));
     }, 50);
   }, [stopVolumePolling]);
 
@@ -101,7 +115,7 @@ export function useVoiceAssistant() {
       wsRef.current = null;
     }
 
-    setState((prev) => ({ ...prev, inputVolume: 0, outputVolume: 0 }));
+    setState((prev) => ({ ...prev, inputVolume: 0, outputVolume: 0, inputPitch: 0, outputPitch: 0 }));
   }, [stopVolumePolling]);
 
   // ── Message Handler ──────────────────────────────────────────────────────
@@ -154,14 +168,27 @@ export function useVoiceAssistant() {
 
         case 'transcript':
           if (msg.text && msg.role) {
-            setState((prev) => ({
-              ...prev,
-              transcripts: [
-                ...prev.transcripts,
-                { role: msg.role as 'user' | 'model', text: msg.text!, timestamp: new Date() },
-              ],
-            }));
+            // Capture and reset the fresh-turn flag *outside* setState to avoid side-effects inside updater
+            const fresh = forceFreshTurnRef.current;
+            forceFreshTurnRef.current = false;
+            setState((prev) => {
+              const list = [...prev.transcripts];
+              const last = list[list.length - 1];
+              if (last && last.role === msg.role && !fresh) {
+                // Accumulate streaming fragment into the current turn
+                const sep = last.text.endsWith(' ') || msg.text!.startsWith(' ') ? '' : ' ';
+                list[list.length - 1] = { ...last, text: last.text + sep + msg.text! };
+              } else {
+                list.push({ role: msg.role as 'user' | 'model', text: msg.text!, timestamp: new Date() });
+              }
+              return { ...prev, transcripts: list };
+            });
           }
+          break;
+
+        case 'turn_complete':
+          // Mark that the next transcript message should open a new turn
+          forceFreshTurnRef.current = true;
           break;
 
         case 'interrupted':
@@ -170,10 +197,14 @@ export function useVoiceAssistant() {
           nextStartTimeRef.current = 0;
           break;
 
-        case 'error':
-          console.error('Server error:', msg.message);
+        case 'error': {
+          const errMsg = typeof msg.message === 'string'
+            ? msg.message
+            : JSON.stringify(msg.message);
+          console.error('Server error:', errMsg);
           setConnectionState(ConnectionState.ERROR);
           break;
+        }
       }
     },
     [setConnectionState],
@@ -229,7 +260,7 @@ export function useVoiceAssistant() {
 
       // ScriptProcessor is deprecated but universally supported.
       // For production, consider upgrading to AudioWorklet.
-      const processor = inputCtx.createScriptProcessor(4096, 1, 1);
+      const processor = inputCtx.createScriptProcessor(2048, 1, 1);
       processor.onaudioprocess = (e) => {
         if (wsRef.current?.readyState !== WebSocket.OPEN) return;
         const float32 = e.inputBuffer.getChannelData(0);
@@ -264,6 +295,8 @@ export function useVoiceAssistant() {
     transcripts: state.transcripts,
     inputVolume: state.inputVolume,
     outputVolume: state.outputVolume,
+    inputPitch: state.inputPitch,
+    outputPitch: state.outputPitch,
     connect,
     disconnect,
     isConnected: state.connectionState === ConnectionState.CONNECTED,

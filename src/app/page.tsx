@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, MessageSquare, X } from 'lucide-react';
+import { useState } from 'react';
+import { motion } from 'motion/react';
+import { Mic, MicOff } from 'lucide-react';
 import CallistoOrb from '@/components/CallistoOrb';
-import TranscriptPanel from '@/components/TranscriptPanel';
 import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
 import { ConnectionState } from '@/types';
 
@@ -15,49 +14,57 @@ const GeminiStar = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const STATUS_LABEL: Record<ConnectionState, string> = {
-  [ConnectionState.CONNECTED]: 'Listening',
-  [ConnectionState.CONNECTING]: 'Connecting…',
-  [ConnectionState.ERROR]: 'Connection error',
-  [ConnectionState.DISCONNECTED]: 'Standby',
-};
-
-const STATUS_COLOR: Record<ConnectionState, string> = {
-  [ConnectionState.CONNECTED]: '#60a5fa',
-  [ConnectionState.CONNECTING]: '#a78bfa',
-  [ConnectionState.ERROR]: '#f87171',
-  [ConnectionState.DISCONNECTED]: '#525252',
-};
-
 export default function Home() {
-  const [showTranscript, setShowTranscript] = useState(false);
+  const [showTranscripts, setShowTranscripts] = useState(true);
 
   const {
     connectionState,
     transcripts,
     inputVolume,
     outputVolume,
+    inputPitch,
+    outputPitch,
     connect,
     disconnect,
     isConnected,
     isConnecting,
   } = useVoiceAssistant();
 
-  // Use whichever volume source is louder for the visual
-  const audioLevel = isConnected ? Math.max(inputVolume, outputVolume) : 0;
+  // Detect when the AI is actively producing audio
+  const isSpeaking = isConnected && outputVolume > 0.04;
+
+  // Drive orb particle animation from whichever source is active
+  const audioLevel = isConnected ? (isSpeaking ? outputVolume : inputVolume) : 0;
+
+  // Unused pitch refs kept to avoid breaking the hook signature
+  void inputPitch; void outputPitch;
+
+  // Dynamic status label and accent colour
+  const statusLabel =
+    connectionState === ConnectionState.CONNECTED    ? (isSpeaking ? 'Speaking' : 'Listening') :
+    connectionState === ConnectionState.CONNECTING   ? 'Connecting…' :
+    connectionState === ConnectionState.ERROR        ? 'Connection error' :
+    'Standby';
+
+  const statusColor =
+    connectionState === ConnectionState.CONNECTED    ? (isSpeaking ? '#2dd4bf' : '#60a5fa') :
+    connectionState === ConnectionState.CONNECTING   ? '#a78bfa' :
+    connectionState === ConnectionState.ERROR        ? '#f87171' :
+    '#525252';
+
+  // Show only the last 3 turns per side — no scroll, just the recent lines
+  const aiTurns   = transcripts.filter((t) => t.role === 'model').slice(-3);
+  const userTurns = transcripts.filter((t) => t.role === 'user').slice(-3);
 
   const handleOrbClick = () => {
-    if (isConnected) {
-      disconnect();
-    } else if (!isConnecting) {
-      void connect();
-    }
+    if (isConnected) disconnect();
+    else if (!isConnecting) void connect();
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center overflow-hidden relative select-none">
+    <div className="h-screen bg-black flex flex-col items-center justify-center overflow-hidden relative select-none">
 
-      {/* ── Decorative star background ─────────────────────────────────────── */}
+      {/* ── Decorative star background ──────────────────────────────────── */}
       <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
         <GeminiStar className="absolute top-[10%] left-[20%] w-3 h-3 text-white opacity-80" />
         <GeminiStar className="absolute top-[30%] left-[80%] w-4 h-4 text-white opacity-60" />
@@ -70,20 +77,21 @@ export default function Home() {
         <GeminiStar className="absolute top-[15%] left-[50%] w-3 h-3 text-neutral-300 opacity-40" />
       </div>
 
-      {/* ── Main content ───────────────────────────────────────────────────── */}
+      {/* ── Centered orb + controls ─────────────────────────────────────── */}
       <div className="relative z-10 flex flex-col items-center w-full max-w-sm px-6">
 
-        {/* Orb */}
-        <CallistoOrb
-          audioLevel={audioLevel}
-          isActive={isConnected}
-          onClick={handleOrbClick}
-        />
+        {/* Orb — particle animation only, position is fixed */}
+        <div className="w-full">
+          <CallistoOrb
+            audioLevel={audioLevel}
+            isActive={isConnected}
+            onClick={handleOrbClick}
+          />
+        </div>
 
-        {/* Controls */}
-        <div className="mt-8 flex flex-col items-center gap-6">
+        <div className="mt-16 flex flex-col items-center gap-6">
 
-          {/* Mic toggle button */}
+          {/* Mic toggle */}
           <motion.button
             whileHover={{ scale: isConnecting ? 1 : 1.05 }}
             whileTap={{ scale: isConnecting ? 1 : 0.95 }}
@@ -94,7 +102,9 @@ export default function Home() {
               w-16 h-16 rounded-full flex items-center justify-center
               transition-colors duration-300 disabled:cursor-not-allowed disabled:opacity-60
               ${isConnected
-                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50 shadow-[0_0_24px_rgba(59,130,246,0.35)]'
+                ? isSpeaking
+                  ? 'bg-teal-500/20 text-teal-400 border border-teal-500/50 shadow-[0_0_20px_rgba(20,184,166,0.3)]'
+                  : 'bg-blue-500/20 text-blue-400 border border-blue-500/50 shadow-[0_0_24px_rgba(59,130,246,0.35)]'
                 : connectionState === ConnectionState.ERROR
                   ? 'bg-red-500/20 text-red-400 border border-red-500/50'
                   : connectionState === ConnectionState.CONNECTING
@@ -115,49 +125,78 @@ export default function Home() {
             </motion.h1>
             <motion.p
               className="text-xs tracking-widest uppercase mt-2"
-              animate={{
-                color: STATUS_COLOR[connectionState],
-                opacity: isConnected ? 1 : 0.55,
-              }}
+              animate={{ color: statusColor, opacity: isConnected ? 1 : 0.55 }}
               transition={{ duration: 0.4 }}
             >
-              {STATUS_LABEL[connectionState]}
+              {statusLabel}
             </motion.p>
           </div>
         </div>
       </div>
 
-      {/* ── Transcript toggle ───────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {transcripts.length > 0 && (
-          <motion.button
-            key="transcript-toggle"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setShowTranscript((v) => !v)}
-            aria-label={showTranscript ? 'Close transcript' : 'Open transcript'}
-            className="fixed bottom-6 right-6 z-20 w-12 h-12 rounded-full
-                       bg-neutral-900/80 border border-neutral-700 text-neutral-400
-                       hover:text-neutral-200 flex items-center justify-center
-                       transition-colors backdrop-blur-sm"
-          >
-            {showTranscript ? <X className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {/* ── Callisto’s responses — floating text on left ────────────────────── */}
+      {showTranscripts && (
+        <div className="fixed left-0 top-1/2 -translate-y-1/2 z-10 flex flex-col items-start gap-4
+                        max-w-[26vw] pl-8 pr-4 pointer-events-none">
+          {aiTurns.map((turn, i) => (
+            <motion.div
+              key={turn.timestamp.getTime()}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: i === aiTurns.length - 1 ? 1 : 0.35 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col items-start gap-0.5"
+            >
+              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#4ba2af' }}>Callisto</span>
+              <p className="text-sm leading-relaxed font-light" style={{ color: '#4ba2af' }}>
+                {turn.text}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
-      {/* ── Transcript panel ────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {showTranscript && (
-          <TranscriptPanel
-            transcripts={transcripts}
-            onClose={() => setShowTranscript(false)}
+      {/* ── User’s transcriptions — floating text on right ───────────────────── */}
+      {showTranscripts && (
+        <div className="fixed right-0 top-1/2 -translate-y-1/2 z-10 flex flex-col items-start gap-4
+                        max-w-[26vw] pr-8 pl-4 pointer-events-none">
+          {userTurns.map((turn, i) => (
+            <motion.div
+              key={turn.timestamp.getTime()}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: i === userTurns.length - 1 ? 1 : 0.35 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col items-start gap-0.5"
+            >
+              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#8b665d' }}>You</span>
+              <p className="text-sm leading-relaxed font-light" style={{ color: '#8b665d' }}>
+                {turn.text}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Transcript toggle — bottom right slider ───────────────────────── */}
+      <div className="fixed bottom-6 right-6 z-20 flex items-center gap-3">
+        <span className="text-[9px] tracking-widest uppercase"
+              style={{ color: showTranscripts ? '#50a2ff' : '#e5e5e5', opacity: 0.7 }}>
+          {showTranscripts ? 'Transcript on' : 'Transcript off'}
+        </span>
+        <button
+          onClick={() => setShowTranscripts((v) => !v)}
+          aria-label="Toggle transcripts"
+          style={{ background: showTranscripts ? '#091934' : '#262626' }}
+          className="relative w-10 h-5 rounded-full transition-all duration-300 focus:outline-none"
+        >
+          <span
+            style={{ background: showTranscripts ? '#50a2ff' : '#e5e5e5' }}
+            className={`absolute top-1/2 -translate-y-1/2 left-0.5 w-4 h-4 rounded-full transition-transform duration-300
+              ${showTranscripts ? 'translate-x-5' : 'translate-x-0'}`}
           />
-        )}
-      </AnimatePresence>
+        </button>
+      </div>
+
     </div>
   );
 }
+
