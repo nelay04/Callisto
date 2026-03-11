@@ -197,6 +197,34 @@ export function useVoiceAssistant() {
           nextStartTimeRef.current = 0;
           break;
 
+        case 'open_url':
+          if (msg.url) {
+            window.open(msg.url, '_blank', 'noopener,noreferrer');
+          }
+          break;
+
+        case 'send_mailto':
+          if (msg.mailtoUrl) {
+            // Use a hidden anchor click — avoids navigating the current page
+            const a = document.createElement('a');
+            a.href = msg.mailtoUrl;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          }
+          break;
+
+        case 'check_popup': {
+          // NOTE: do NOT pass noopener here — it makes window.open() return null
+          // even when popups are allowed, causing a false "blocked" result.
+          const testWin = window.open('about:blank', '_blank');
+          const allowed = testWin !== null;
+          if (testWin) testWin.close();
+          wsRef.current?.send(JSON.stringify({ type: 'popup_status', allowed }));
+          break;
+        }
+
         case 'error': {
           const errMsg = typeof msg.message === 'string'
             ? msg.message

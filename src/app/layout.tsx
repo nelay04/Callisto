@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Callisto — Voice AI',
+  title: 'Callisto',
   description: 'Callisto is a real-time voice AI assistant powered by Gemini Live.',
 };
 
