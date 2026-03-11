@@ -17,6 +17,8 @@ export function handleSessionWebSocket(ws: WebSocket): void {
   console.log('Client connected');
 
   const gemini = new GeminiService(config.GEMINI_API_KEY);
+  // Stores the pending check_popup tool call id until the frontend responds
+  let pendingPopupCheckCallId: string | null = null;
 
   // ── Wire Gemini callbacks → WebSocket ──────────────────────────────────
 
@@ -51,6 +53,21 @@ export function handleSessionWebSocket(ws: WebSocket): void {
     ws.close();
   };
 
+  gemini.onOpenUrl = (url, contact) => {
+    console.log(`Tool: open_url → ${contact} (${url})`);
+    send(ws, { type: 'open_url', url, contact });
+  };
+
+  gemini.onSendMailto = (mailtoUrl) => {
+    console.log(`Tool: send_mailto → ${mailtoUrl}`);
+    send(ws, { type: 'send_mailto', mailtoUrl });
+  };
+
+  gemini.onCheckPopup = (callId) => {
+    pendingPopupCheckCallId = callId;
+    send(ws, { type: 'check_popup' });
+  };
+
   // Start the Gemini session
   gemini.connect().catch((err: Error) => {
     console.error('Failed to connect to Gemini:', err.message);
@@ -78,6 +95,13 @@ export function handleSessionWebSocket(ws: WebSocket): void {
 
         case 'ping':
           send(ws, { type: 'pong' });
+          break;
+
+        case 'popup_status':
+          if (pendingPopupCheckCallId !== null) {
+            gemini.resolveCheckPopup(pendingPopupCheckCallId, message.allowed ?? false);
+            pendingPopupCheckCallId = null;
+          }
           break;
 
         default:

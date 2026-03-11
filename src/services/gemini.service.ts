@@ -1,5 +1,7 @@
 import { GoogleGenAI, type LiveServerMessage } from '@google/genai';
 import { GEMINI_MODEL, GEMINI_LIVE_CONFIG } from '../config/gemini';
+import { CONTACT_URLS } from '../tools/openUrl.tool';
+import { buildMailtoUrl } from '../tools/mailto.tool';
 
 type TranscriptRole = 'user' | 'model';
 
@@ -20,6 +22,12 @@ export class GeminiService {
   public onTurnComplete: () => void = () => {};
   public onError: (err: Error) => void = () => {};
   public onClose: () => void = () => {};
+  /** Fired when the model calls the open_url tool. Provides the resolved URL. */
+  public onOpenUrl: (url: string, contact: string) => void = () => {};
+  /** Fired when the model calls the send_mailto tool. Provides the full mailto: URL. */
+  public onSendMailto: (mailtoUrl: string) => void = () => {};
+  /** Fired when the model calls check_popup. Caller must later invoke resolveCheckPopup(). */
+  public onCheckPopup: (callId: string) => void = () => {};
 
   constructor(apiKey: string) {
     this.ai = new GoogleGenAI({ apiKey });
@@ -44,6 +52,20 @@ export class GeminiService {
   sendAudio(base64PCM: string): void {
     this.session?.sendRealtimeInput({
       media: { data: base64PCM, mimeType: 'audio/pcm;rate=16000' },
+    });
+  }
+
+  /**
+   * Resolve a pending check_popup tool call once the frontend has reported
+   * whether popups are allowed. Must be called in response to onCheckPopup.
+   */
+  resolveCheckPopup(callId: string, allowed: boolean): void {
+    this.session?.sendToolResponse({
+      functionResponses: [{
+        id: callId,
+        name: 'check_popup',
+        response: { output: { popupsAllowed: allowed } },
+      }],
     });
   }
 
@@ -86,6 +108,48 @@ export class GeminiService {
     // 5. Turn complete
     if (msg.serverContent?.turnComplete) {
       this.onTurnComplete();
+    }
+
+    // 6. Tool / function calls from the model
+    const functionCalls = msg.toolCall?.functionCalls;
+    if (functionCalls?.length) {
+      for (const call of functionCalls) {
+        if (call.name === 'open_url') {
+          const contact = (call.args as Record<string, string>)?.contact?.toLowerCase();
+          const url = CONTACT_URLS[contact];
+
+          this.session?.sendToolResponse({
+            functionResponses: [{
+              id: call.id,
+              name: call.name,
+              response: url
+                ? { output: { success: true, opened: contact } }
+                : { output: { success: false, error: `Unknown contact: ${contact}` } },
+            }],
+          });
+
+          if (url) this.onOpenUrl(url, contact);
+
+        } else if (call.name === 'send_mailto') {
+          const args = call.args as Record<string, string> | undefined ?? {};
+          const mailtoUrl = buildMailtoUrl(args.subject, args.body);
+
+          this.session?.sendToolResponse({
+            functionResponses: [{
+              id: call.id,
+              name: call.name,
+              response: { output: { success: true } },
+            }],
+          });
+
+          this.onSendMailto(mailtoUrl);
+
+        } else if (call.name === 'check_popup') {
+          // Response is deferred — the controller will call resolveCheckPopup()
+          // once the frontend reports back via popup_status message.
+          this.onCheckPopup(call.id ?? '');
+        }
+      }
     }
   }
 }

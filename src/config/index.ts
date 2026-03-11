@@ -15,4 +15,7 @@ export const config = {
   get GEMINI_API_KEY() {
     return requireEnv('GEMINI_API_KEY');
   },
+  get MAILTO_ADDRESS() {
+    return requireEnv('MAILTO_ADDRESS');
+  },
 } as const;
