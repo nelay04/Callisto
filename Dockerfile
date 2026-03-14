@@ -7,8 +7,14 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
 
+# Add these lines to pull in the variables during build
+ARG NEXT_PUBLIC_WS_URL
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+RUN npm run build
 # ── Production stage ─────────────────────────────────────────────────────────
 FROM node:22-bookworm-slim AS runner
 
