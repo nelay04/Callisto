@@ -1,0 +1,40 @@
+# Runs both halves of Callisto from the repo root:
+#
+#   cp apps/server/.env.example apps/server/.env   # add your Gemini API key
+#   docker compose up --build
+#
+# Both images build from the repo root so npm workspaces resolve correctly.
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    restart: unless-stopped
+    env_file: apps/server/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      # Must match the origin the browser loads the web app from, or the
+      # WebSocket upgrade is rejected.
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+    ports:
+      - "3001:3001"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # NEXT_PUBLIC_* are inlined at build time, so they belong here rather
+        # than in `environment` below.
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:3001/ws/session}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "3000:3000"

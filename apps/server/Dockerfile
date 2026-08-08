@@ -1,27 +1,51 @@
+# Build context is the repo ROOT, not this directory — npm workspaces hoist
+# node_modules, so the install needs the root manifest and lockfile.
+#
+#   docker build -f apps/server/Dockerfile .
+
 # ── Build stage ─────────────────────────────────────────────────────────────
 FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+# Copy manifests first so the install layer caches independently of source.
+COPY package.json package-lock.json ./
+COPY packages/protocol/package.json ./packages/protocol/
+COPY apps/server/package.json ./apps/server/
+COPY apps/web/package.json ./apps/web/
 
-COPY tsconfig.json ./
-COPY src ./src
-RUN npm run build
+# --ignore-scripts skips the root `prepare` hook, which builds the protocol
+# package before its sources have been copied in.
+RUN npm ci --ignore-scripts
 
-# ── Production stage ─────────────────────────────────────────────────────────
+COPY packages/protocol ./packages/protocol
+COPY apps/server ./apps/server
+
+RUN npm run build -w @callisto/protocol \
+ && npm run build -w @callisto/server
+
+# Drop dev dependencies from the tree we are about to copy forward.
+RUN npm prune --omit=dev
+
+# ── Production stage ────────────────────────────────────────────────────────
 FROM node:22-bookworm-slim AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-COPY package*.json ./
-RUN npm ci --omit=dev
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/protocol/dist ./packages/protocol/dist
+COPY --from=builder /app/packages/protocol/package.json ./packages/protocol/
+COPY --from=builder /app/apps/server/dist ./apps/server/dist
+COPY --from=builder /app/apps/server/package.json ./apps/server/
 
-COPY --from=builder /app/dist ./dist
+# Run as the unprivileged user the base image already provides.
+USER node
 
 EXPOSE 3001
 
-CMD ["node", "dist/server.js"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["node", "apps/server/dist/server.js"]
