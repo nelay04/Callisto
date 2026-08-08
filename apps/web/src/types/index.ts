@@ -1,5 +1,15 @@
-// ─── Shared Frontend Types ────────────────────────────────────────────────────
+// ─── Frontend-only types ─────────────────────────────────────────────────────
+//
+// The WebSocket wire format lives in `@callisto/protocol`, shared with the
+// server. Only types that never cross the socket belong here.
 
+export type {
+  ClientMessage,
+  ServerMessage,
+  TranscriptRole,
+} from '@callisto/protocol';
+
+/** Lifecycle of the browser's connection to the session server. */
 export enum ConnectionState {
   DISCONNECTED = 'DISCONNECTED',
   CONNECTING = 'CONNECTING',
@@ -7,35 +17,13 @@ export enum ConnectionState {
   ERROR = 'ERROR',
 }
 
+/**
+ * One contiguous block of speech from a single speaker, as rendered in the
+ * transcript panel. Streaming `transcript` messages are merged into the
+ * trailing turn until the speaker changes or the model's turn completes.
+ */
 export interface Turn {
   role: 'user' | 'model';
   text: string;
   timestamp: Date;
-}
-
-/** Messages received from the Callisto Node WebSocket server */
-export interface ServerMessage {
-  type:
-    | 'session_ready'
-    | 'audio_chunk'
-    | 'transcript'
-    | 'interrupted'
-    | 'turn_complete'
-    | 'error'
-    | 'pong'
-    | 'open_url'
-    | 'send_mailto'
-    | 'check_popup';
-  /** Base64-encoded PCM16 at 24 kHz — present when type === 'audio_chunk' */
-  data?: string;
-  text?: string;
-  role?: 'user' | 'model';
-  isFinal?: boolean;
-  message?: string;
-  /** URL to open — present when type === 'open_url' */
-  url?: string;
-  /** Contact name — present when type === 'open_url' */
-  contact?: string;
-  /** Full mailto: URL — present when type === 'send_mailto' */
-  mailtoUrl?: string;
 }
