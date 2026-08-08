@@ -3,13 +3,19 @@
  * base64-encoded PCM16 string at 16 kHz, suitable for sending to the backend.
  */
 export function createPcmBase64(float32: Float32Array): string {
-  const int16 = new Int16Array(float32.length);
+  const bytes = new Uint8Array(float32.length * 2);
+  const view = new DataView(bytes.buffer);
+
   for (let i = 0; i < float32.length; i++) {
     const clamped = Math.max(-1, Math.min(1, float32[i]));
-    int16[i] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
+    // Asymmetric scaling: PCM16 spans -32768..32767, so the negative side has
+    // one more step than the positive side.
+    const sample = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
+    // Gemini expects little-endian; write it explicitly rather than relying on
+    // the host's byte order.
+    view.setInt16(i * 2, sample, true);
   }
 
-  const bytes = new Uint8Array(int16.buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
@@ -30,17 +36,35 @@ export function decodeBase64ToPCM(
   ctx: AudioContext,
   sampleRate: number,
 ): AudioBuffer {
+  const samples = decodePcm16Base64(base64);
+  const buffer = ctx.createBuffer(1, samples.length, sampleRate);
+  buffer.getChannelData(0).set(samples);
+  return buffer;
+}
+
+/**
+ * Decode base64 PCM16 into normalised float samples in [-1, 1).
+ *
+ * Split out from {@link decodeBase64ToPCM} so the format conversion — the part
+ * that can silently produce noise if it's wrong — is testable without a
+ * browser AudioContext.
+ */
+export function decodePcm16Base64(base64: string): Float32Array {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
 
-  const int16 = new Int16Array(bytes.buffer);
-  const buffer = ctx.createBuffer(1, int16.length, sampleRate);
-  const channelData = buffer.getChannelData(0);
-  for (let i = 0; i < int16.length; i++) {
-    channelData[i] = int16[i] / 32768.0;
+  // A trailing odd byte cannot form a sample; drop it rather than letting the
+  // Int16Array constructor throw on a non-multiple-of-2 length.
+  const sampleCount = Math.floor(bytes.byteLength / 2);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, sampleCount * 2);
+  const samples = new Float32Array(sampleCount);
+  for (let i = 0; i < sampleCount; i++) {
+    // Gemini sends little-endian PCM16; read it explicitly rather than relying
+    // on the host's byte order.
+    samples[i] = view.getInt16(i * 2, true) / 32768;
   }
-  return buffer;
+  return samples;
 }
