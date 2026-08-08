@@ -1,0 +1,33 @@
+{
+  "name": "callisto",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Callisto — a real-time voice AI assistant built on the Gemini Live API",
+  "license": "MIT",
+  "author": "Nelay Karmakar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nelay04/Callisto.git"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "prepare": "npm run build -w @callisto/protocol",
+    "dev": "concurrently -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev -w @callisto/server",
+    "dev:web": "npm run dev -w @callisto/web",
+    "build": "npm run build -w @callisto/protocol && npm run build -w @callisto/server && npm run build -w @callisto/web",
+    "test": "npm run build -w @callisto/protocol && npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run build -w @callisto/protocol && npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "5.9.3"
+  }
+}

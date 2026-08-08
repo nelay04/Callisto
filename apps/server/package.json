@@ -1,15 +1,20 @@
 {
-  "name": "callisto-node",
+  "name": "@callisto/server",
   "version": "1.0.0",
-  "description": "Callisto Voice Assistant — Express + WebSocket backend",
+  "private": true,
+  "description": "Callisto session server — Express + WebSocket bridge to the Gemini Live API",
+  "license": "MIT",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "lint": "eslint src",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@callisto/protocol": "*",
     "@google/genai": "^1.40.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -17,11 +22,15 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.12",
+    "eslint": "^9.39.1",
     "tsx": "^4.16.0",
-    "typescript": "^5.5.0"
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^3.2.4"
   }
 }
