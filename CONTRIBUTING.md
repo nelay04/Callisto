@@ -1,0 +1,52 @@
+# Contributing
+
+Thanks for taking a look. Issues and pull requests are welcome.
+
+## Getting set up
+
+See the [quickstart](README.md#quickstart). You need Node 22+ and your own
+[Gemini API key](https://aistudio.google.com/apikey) — there is no shared test
+credential.
+
+## Before opening a pull request
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+CI runs exactly these, plus a build of both Docker images.
+
+## What the tests cover — and what they don't
+
+Automated tests target pure logic where a bug is silent rather than loud: PCM16
+conversion, transcript merging, protocol validation, and WebSocket admission
+control. There are deliberately **no** tests that mock the Gemini Live session
+— a mock of a streaming audio API tests the mock, not the code.
+
+So anything touching audio or the live session needs a manual pass:
+
+1. `npm run dev`, open <http://localhost:3000>, allow the microphone.
+2. Say something. Confirm you hear a reply and both sides appear in the
+   transcript panel as coherent turns, not word-by-word fragments.
+3. Talk over Callisto mid-reply. Playback should stop immediately.
+4. Ask her to open your GitHub, and to draft an email. Try it once with
+   popups blocked — she should tell you they're blocked rather than
+   pretending the tab opened.
+
+## Conventions
+
+- TypeScript strict mode; no `any` without a comment explaining why.
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
+  (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`).
+- Anything crossing the WebSocket belongs in
+  [`packages/protocol`](packages/protocol/src/index.ts), never duplicated into
+  an app. Add the variant to the union and let the exhaustiveness checks in
+  both switch statements tell you what to implement.
+
+## Reporting a security issue
+
+Please don't open a public issue. Email the address configured in this
+project's `MAILTO_ADDRESS`, or use GitHub's private vulnerability reporting.
