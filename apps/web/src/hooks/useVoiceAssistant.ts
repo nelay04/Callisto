@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ConnectionState, type Turn, type ServerMessage } from '@/types';
+import { isServerMessage } from '@callisto/protocol';
+import { ConnectionState, type Turn, type ClientMessage } from '@/types';
 import { createPcmBase64, decodeBase64ToPCM } from '@/lib/audioUtils';
+import { appendTranscript } from '@/lib/transcript';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:3001/ws/session';
 
@@ -47,6 +49,12 @@ export function useVoiceAssistant() {
   const forceFreshTurnRef = useRef(false);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /** Send a protocol message, silently dropping it if the socket isn't open. */
+  const sendToServer = useCallback((message: ClientMessage) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify(message));
+  }, []);
 
   const setConnectionState = useCallback((s: ConnectionState) => {
     connectionStateRef.current = s;
@@ -122,13 +130,19 @@ export function useVoiceAssistant() {
 
   const handleMessage = useCallback(
     (raw: string) => {
-      let msg: ServerMessage;
+      let parsed: unknown;
       try {
-        msg = JSON.parse(raw) as ServerMessage;
+        parsed = JSON.parse(raw);
       } catch {
         console.error('Failed to parse server message');
         return;
       }
+
+      if (!isServerMessage(parsed)) {
+        console.warn('Ignoring unrecognised message from server');
+        return;
+      }
+      const msg = parsed;
 
       switch (msg.type) {
         case 'session_ready':
@@ -166,25 +180,19 @@ export function useVoiceAssistant() {
           break;
         }
 
-        case 'transcript':
-          if (msg.text && msg.role) {
-            // Capture and reset the fresh-turn flag *outside* setState to avoid side-effects inside updater
-            const fresh = forceFreshTurnRef.current;
-            forceFreshTurnRef.current = false;
-            setState((prev) => {
-              const list = [...prev.transcripts];
-              const last = list[list.length - 1];
-              if (last && last.role === msg.role && !fresh) {
-                // Accumulate streaming fragment into the current turn
-                const sep = last.text.endsWith(' ') || msg.text!.startsWith(' ') ? '' : ' ';
-                list[list.length - 1] = { ...last, text: last.text + sep + msg.text! };
-              } else {
-                list.push({ role: msg.role as 'user' | 'model', text: msg.text!, timestamp: new Date() });
-              }
-              return { ...prev, transcripts: list };
-            });
-          }
+        case 'transcript': {
+          if (!msg.text) break;
+          // Read and clear the flag *outside* setState — the updater must stay
+          // pure, since React may invoke it more than once.
+          const fresh = forceFreshTurnRef.current;
+          forceFreshTurnRef.current = false;
+          const fragment = { role: msg.role, text: msg.text };
+          setState((prev) => ({
+            ...prev,
+            transcripts: appendTranscript(prev.transcripts, fragment, fresh),
+          }));
           break;
+        }
 
         case 'turn_complete':
           // Mark that the next transcript message should open a new turn
@@ -221,21 +229,29 @@ export function useVoiceAssistant() {
           const testWin = window.open('about:blank', '_blank');
           const allowed = testWin !== null;
           if (testWin) testWin.close();
-          wsRef.current?.send(JSON.stringify({ type: 'popup_status', allowed }));
+          sendToServer({ type: 'popup_status', allowed });
           break;
         }
 
-        case 'error': {
-          const errMsg = typeof msg.message === 'string'
-            ? msg.message
-            : JSON.stringify(msg.message);
-          console.error('Server error:', errMsg);
+        case 'pong':
+          // Liveness reply; receiving it is the whole point, nothing to do.
+          break;
+
+        case 'error':
+          console.error('Server error:', msg.message);
           setConnectionState(ConnectionState.ERROR);
+          break;
+
+        // Adding a ServerMessage variant without handling it above fails to
+        // compile here, rather than being silently dropped at runtime.
+        default: {
+          const unhandled: never = msg;
+          console.warn('Unhandled server message:', unhandled);
           break;
         }
       }
     },
-    [setConnectionState],
+    [setConnectionState, sendToServer],
   );
 
   // Keep the ref in sync with the latest handler
@@ -290,10 +306,8 @@ export function useVoiceAssistant() {
       // For production, consider upgrading to AudioWorklet.
       const processor = inputCtx.createScriptProcessor(2048, 1, 1);
       processor.onaudioprocess = (e) => {
-        if (wsRef.current?.readyState !== WebSocket.OPEN) return;
         const float32 = e.inputBuffer.getChannelData(0);
-        const base64 = createPcmBase64(float32);
-        wsRef.current.send(JSON.stringify({ type: 'audio_chunk', data: base64 }));
+        sendToServer({ type: 'audio_chunk', data: createPcmBase64(float32) });
       };
 
       analyserInRef.current.connect(processor);
@@ -306,7 +320,7 @@ export function useVoiceAssistant() {
       teardown();
       setConnectionState(ConnectionState.ERROR);
     }
-  }, [setConnectionState, teardown, startVolumePolling]);
+  }, [setConnectionState, teardown, startVolumePolling, sendToServer]);
 
   const disconnect = useCallback(() => {
     teardown();

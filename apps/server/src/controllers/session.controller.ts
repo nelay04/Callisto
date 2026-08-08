@@ -1,7 +1,8 @@
 import { WebSocket } from 'ws';
+import { isClientMessage } from '@callisto/protocol';
 import { GeminiService } from '../services/gemini.service';
 import { config } from '../config';
-import type { ClientMessage, ServerMessage } from '../types';
+import type { ServerMessage } from '../types';
 
 function send(ws: WebSocket, message: ServerMessage): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -78,37 +79,47 @@ export function handleSessionWebSocket(ws: WebSocket): void {
   // ── Handle messages from the browser ───────────────────────────────────
 
   ws.on('message', (rawData: Buffer) => {
+    let parsed: unknown;
     try {
-      const message = JSON.parse(rawData.toString()) as ClientMessage;
-
-      switch (message.type) {
-        case 'audio_chunk':
-          if (message.data) {
-            gemini.sendAudio(message.data);
-          }
-          break;
-
-        case 'interrupt':
-          // Gemini Live handles barge-in automatically via real-time audio input.
-          // Reserved for explicit client-side interruption signals if needed.
-          break;
-
-        case 'ping':
-          send(ws, { type: 'pong' });
-          break;
-
-        case 'popup_status':
-          if (pendingPopupCheckCallId !== null) {
-            gemini.resolveCheckPopup(pendingPopupCheckCallId, message.allowed ?? false);
-            pendingPopupCheckCallId = null;
-          }
-          break;
-
-        default:
-          console.warn('Unknown message type from client:', (message as { type: string }).type);
-      }
+      parsed = JSON.parse(rawData.toString());
     } catch (err) {
       console.error('Failed to parse client message:', err);
+      return;
+    }
+
+    if (!isClientMessage(parsed)) {
+      console.warn('Ignoring unrecognised message from client');
+      return;
+    }
+
+    switch (parsed.type) {
+      case 'audio_chunk':
+        gemini.sendAudio(parsed.data);
+        break;
+
+      case 'interrupt':
+        // Gemini Live handles barge-in automatically via real-time audio input.
+        // Reserved for explicit client-side interruption signals if needed.
+        break;
+
+      case 'ping':
+        send(ws, { type: 'pong' });
+        break;
+
+      case 'popup_status':
+        if (pendingPopupCheckCallId !== null) {
+          gemini.resolveCheckPopup(pendingPopupCheckCallId, parsed.allowed);
+          pendingPopupCheckCallId = null;
+        }
+        break;
+
+      // Adding a ClientMessage variant without handling it above fails to
+      // compile here, rather than being silently dropped at runtime.
+      default: {
+        const unhandled: never = parsed;
+        console.warn('Unhandled client message:', unhandled);
+        break;
+      }
     }
   });
 
