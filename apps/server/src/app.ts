@@ -10,8 +10,13 @@ app.use(corsMiddleware);
 app.use(express.json());
 
 // ── Health Check ─────────────────────────────────────────────────────────────
+// Deliberately echoes no configuration — this endpoint is publicly reachable.
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // ── API Routes ────────────────────────────────────────────────────────────────

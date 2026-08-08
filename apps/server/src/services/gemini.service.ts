@@ -1,9 +1,8 @@
-import { GoogleGenAI, type LiveServerMessage } from '@google/genai';
+import { GoogleGenAI, type LiveServerMessage, type Session } from '@google/genai';
+import type { TranscriptRole } from '@callisto/protocol';
 import { GEMINI_MODEL, GEMINI_LIVE_CONFIG } from '../config/gemini';
-import { CONTACT_URLS } from '../tools/openUrl.tool';
+import { resolveContactUrl } from '../tools/openUrl.tool';
 import { buildMailtoUrl } from '../tools/mailto.tool';
-
-type TranscriptRole = 'user' | 'model';
 
 /**
  * Wraps a single Gemini Live API session.
@@ -11,8 +10,7 @@ type TranscriptRole = 'user' | 'model';
  */
 export class GeminiService {
   private readonly ai: GoogleGenAI;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private session: any = null;
+  private session: Session | null = null;
 
   // ── Event Callbacks ──────────────────────────────────────────────────────
   public onReady: () => void = () => {};
@@ -116,7 +114,7 @@ export class GeminiService {
       for (const call of functionCalls) {
         if (call.name === 'open_url') {
           const contact = (call.args as Record<string, string>)?.contact?.toLowerCase();
-          const url = CONTACT_URLS[contact];
+          const url = resolveContactUrl(contact);
 
           this.session?.sendToolResponse({
             functionResponses: [{

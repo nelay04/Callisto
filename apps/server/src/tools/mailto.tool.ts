@@ -1,18 +1,22 @@
 import { Type, type FunctionDeclaration } from '@google/genai';
 
-/** Recipient address loaded from environment */
-export const MAILTO_ADDRESS: string =
-  process.env.MAILTO_ADDRESS ?? '';
-
 /**
- * Builds a `mailto:` URL from the given arguments.
- * The recipient is always the owner's address from the environment.
+ * Build a `mailto:` URL addressed to the owner.
+ *
+ * The recipient is never model-supplied — it always comes from
+ * `MAILTO_ADDRESS` — so the model can draft a message *to the owner* and
+ * nothing else. `address` is a parameter only so this stays testable without
+ * reaching into the environment.
  */
-export function buildMailtoUrl(subject?: string, body?: string): string {
+export function buildMailtoUrl(
+  subject?: string,
+  body?: string,
+  address: string = process.env.MAILTO_ADDRESS ?? '',
+): string {
   const params: string[] = [];
   if (subject) params.push(`subject=${encodeURIComponent(subject)}`);
   if (body)    params.push(`body=${encodeURIComponent(body)}`);
-  return `mailto:${MAILTO_ADDRESS}${params.length ? `?${params.join('&')}` : ''}`;
+  return `mailto:${address}${params.length ? `?${params.join('&')}` : ''}`;
 }
 
 /**

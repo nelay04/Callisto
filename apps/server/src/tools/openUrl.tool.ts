@@ -1,10 +1,26 @@
 import { Type, type FunctionDeclaration } from '@google/genai';
 
-/** Mapping of known contact names → their URLs */
-export const CONTACT_URLS: Record<string, string> = {
-  linkedin: process.env.LINKEDIN_URL ?? 'https://www.linkedin.com/in/your-profile',
-  github:   process.env.GITHUB_URL   ?? 'https://github.com/your-username',
-};
+/** Profile names the `open_url` tool understands. */
+export const SUPPORTED_CONTACTS = ['linkedin', 'github'] as const;
+
+/**
+ * Resolve a contact name to its configured URL, or `undefined` when the profile
+ * is unknown or simply not configured.
+ *
+ * The environment is read on every call rather than at import time, so the
+ * result can't depend on whether `dotenv` happened to run before this module
+ * was first loaded.
+ */
+export function resolveContactUrl(contact: string | undefined): string | undefined {
+  switch (contact?.toLowerCase()) {
+    case 'linkedin':
+      return process.env.LINKEDIN_URL || undefined;
+    case 'github':
+      return process.env.GITHUB_URL || undefined;
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Gemini function declaration for the `open_url` tool.
@@ -28,7 +44,7 @@ export const openUrlDeclaration: FunctionDeclaration = {
       contact: {
         type: Type.STRING,
         description: 'The profile to open. Must be one of: "linkedin", "github".',
-        enum: ['linkedin', 'github'],
+        enum: [...SUPPORTED_CONTACTS],
       },
     },
     required: ['contact'],
