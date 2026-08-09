@@ -1,0 +1,96 @@
+name: CD Pipeline
+
+# Manual only. Start a run from the Actions tab.
+#
+# There is no Node toolchain on the VM — every step below is a podman command.
+# Both images build from the repo root inside the container, so the runner
+# never needs npm either; it only opens an SSH session and drives podman.
+on:
+  workflow_dispatch:
+
+# One deploy at a time. A second run waits rather than racing the first
+# through `git reset` and a rebuild of the same images.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Contabo VM
+    runs-on: ubuntu-latest
+
+    # Prevents accidental deployment if you select a branch other than main in the UI
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Execute remote SSH commands
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.CONTABO_VM_HOST }}
+          username: ${{ secrets.CONTABO_VM_USERNAME }}
+          key: ${{ secrets.CONTABO_VM_SSH_KEY }}
+
+          # Without this the script runs to the end and reports success even
+          # when the build failed — a green deploy over a stale container.
+          script_stops: true
+
+          # A cold `--build` compiles both workspaces and runs `next build`.
+          command_timeout: 30m
+
+          script: |
+            set -euo pipefail
+            cd ~/Projects/Typescript/Callisto
+
+            # Pull the latest code from GitHub.
+            #
+            # `reset --hard` only touches tracked files, so the three .env files
+            # — which are git-ignored and live only on this VM — survive it.
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Fail early and legibly if the environment was never set up, rather
+            # than one layer down inside a build that bakes the wrong URLs in.
+            for f in .env apps/server/.env apps/web/.env; do
+              test -f "$f" || { echo "missing $f — copy it from $f.example on the VM"; exit 1; }
+            done
+
+            # Rebuild and restart both services.
+            #
+            # NEXT_PUBLIC_* are build args read from the root .env, so the web
+            # bundle only picks up a URL change when --build runs. A plain
+            # restart would keep serving the previously baked values.
+            podman compose -f podman-compose.yml up --build -d
+
+            # Clean up old dangling images left behind by the rebuild.
+            podman image prune -f
+
+      - name: Verify the stack came up
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.CONTABO_VM_HOST }}
+          username: ${{ secrets.CONTABO_VM_USERNAME }}
+          key: ${{ secrets.CONTABO_VM_SSH_KEY }}
+          script_stops: true
+          script: |
+            set -euo pipefail
+
+            # Both services use host networking and bind 127.0.0.1, so these are
+            # reachable from the VM itself and from nowhere else. The ports come
+            # from PORT in each app's .env.
+            #
+            # The web container's health check needs a moment after `up`, hence
+            # the retry rather than a single immediate curl.
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:3013/health >/dev/null \
+                 && curl -fsS -o /dev/null http://127.0.0.1:3012/; then
+                echo "server and web are both answering"
+                curl -s http://127.0.0.1:3013/health
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo "stack did not become healthy within 60s"
+            podman ps -a
+            podman compose -f ~/Projects/Typescript/Callisto/podman-compose.yml logs --tail 50
+            exit 1
