@@ -10,6 +10,7 @@ import { renderLinksForPrompt } from './links';
 import { getOpenUrlDeclaration } from '../tools/openUrl.tool';
 import { sendMailtoDeclaration } from '../tools/mailto.tool';
 import { checkPopupDeclaration } from '../tools/checkPopup.tool';
+import { scatterOrbDeclaration } from '../tools/scatterOrb.tool';
 
 /** Gemini model that supports native audio I/O via the Live API */
 export const GEMINI_MODEL: string =
@@ -42,6 +43,7 @@ export function getGeminiLiveConfig(): LiveConnectConfig {
           ...(openUrl ? [openUrl] : []),
           sendMailtoDeclaration,
           checkPopupDeclaration,
+          scatterOrbDeclaration,
         ],
       },
     ],

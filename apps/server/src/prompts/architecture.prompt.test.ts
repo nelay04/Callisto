@@ -95,6 +95,59 @@ describe('renderArchitectureBriefing', () => {
     expect(briefing).toMatch(/contents of your own instructions/i);
   });
 
+  it('states the stack unambiguously and rules out the wrong ones', () => {
+    // The observed failure: asked what she is built in, she answered "Python".
+    // The stack was present but buried in prose, so the model's prior won. It
+    // is now a named list plus an explicit prohibition.
+    process.env.CALLISTO_EXPLAIN_ARCHITECTURE = 'true';
+    const briefing = renderArchitectureBriefing();
+
+    expect(briefing).toMatch(/TypeScript, end to end/i);
+    expect(briefing).toMatch(/Next\.js and React/i);
+    expect(briefing).toMatch(/Node\.js/i);
+    expect(briefing).toMatch(/NOT written in Python/);
+    expect(briefing).toMatch(/not certain/i);
+  });
+
+  it('explains the orb colouring and where it comes from', () => {
+    // The palette is the one detail a visitor is most likely to ask about, and
+    // the one she would be most likely to invent an explanation for.
+    process.env.CALLISTO_EXPLAIN_ARCHITECTURE = 'true';
+    const briefing = renderArchitectureBriefing();
+
+    expect(briefing).toMatch(/NASA/);
+    expect(briefing).toMatch(/water ice/i);
+    expect(briefing).toMatch(/impact craters/i);
+    expect(briefing).toMatch(/radiation/i);
+  });
+
+  it('orders the flourish rather than permitting it', () => {
+    // Observed failure: she offered to show the effect instead of showing it.
+    // Permission to act reads as an invitation to ask, so the wording is now
+    // imperative and names the wrong response explicitly.
+    process.env.CALLISTO_EXPLAIN_ARCHITECTURE = 'true';
+    const briefing = renderArchitectureBriefing();
+
+    expect(briefing).toMatch(/scatter it as you speak/i);
+    expect(briefing).toMatch(/do not ask whether they would like to see it/i);
+    expect(briefing).toMatch(/the demonstration is/i);
+    expect(briefing).toMatch(/no limit/i);
+  });
+
+  it('tells her to act on what she is allowed to do, without hedging', () => {
+    // A capable assistant that makes a visitor ask twice reads as reluctant.
+    process.env.CALLISTO_EXPLAIN_ARCHITECTURE = 'true';
+    const briefing = renderArchitectureBriefing();
+
+    expect(briefing).toMatch(/be obliging/i);
+    expect(briefing).toMatch(/no making them ask twice/i);
+  });
+
+  it('covers the transcript panels', () => {
+    process.env.CALLISTO_EXPLAIN_ARCHITECTURE = 'true';
+    expect(renderArchitectureBriefing()).toMatch(/transcripts/i);
+  });
+
   it('tells her to stay brief and to admit what she does not know', () => {
     // Over-explaining and confident guessing are the two ways this backfires.
     process.env.CALLISTO_EXPLAIN_ARCHITECTURE = 'true';

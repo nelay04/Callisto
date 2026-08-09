@@ -64,6 +64,11 @@ export function handleSessionWebSocket(ws: WebSocket): void {
     send(ws, { type: 'send_mailto', mailtoUrl });
   };
 
+  gemini.onScatterOrb = () => {
+    console.log('Tool: scatter_orb');
+    send(ws, { type: 'scatter_orb' });
+  };
+
   gemini.onCheckPopup = (callId) => {
     pendingPopupCheckCallId = callId;
     send(ws, { type: 'check_popup' });

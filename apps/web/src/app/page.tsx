@@ -24,6 +24,7 @@ export default function Home() {
     outputVolume,
     inputPitch,
     outputPitch,
+    scatterToken,
     connect,
     disconnect,
     isConnected,
@@ -85,6 +86,7 @@ export default function Home() {
           <CallistoOrb
             audioLevel={audioLevel}
             isActive={isConnected}
+            scatterToken={scatterToken}
             onClick={handleOrbClick}
           />
         </div>

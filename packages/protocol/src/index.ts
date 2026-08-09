@@ -123,6 +123,17 @@ export interface CheckPopupMessage {
   type: 'check_popup';
 }
 
+/**
+ * The model invoked `scatter_orb`: the client should briefly fling the orb's
+ * particles across the viewport and reassemble them.
+ *
+ * Purely decorative, and deliberately fire-and-forget — there is no response,
+ * because nothing about the conversation depends on the animation finishing.
+ */
+export interface ScatterOrbMessage {
+  type: 'scatter_orb';
+}
+
 /** Any message the server may send to the browser. */
 export type ServerMessage =
   | SessionReadyMessage
@@ -134,7 +145,8 @@ export type ServerMessage =
   | PongMessage
   | OpenUrlMessage
   | SendMailtoMessage
-  | CheckPopupMessage;
+  | CheckPopupMessage
+  | ScatterOrbMessage;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -194,6 +206,8 @@ export function isServerMessage(value: unknown): value is ServerMessage {
       return isNonEmptyString(value.url) && typeof value.name === 'string';
     case 'send_mailto':
       return isNonEmptyString(value.mailtoUrl);
+    case 'scatter_orb':
+      return true;
     default:
       return false;
   }

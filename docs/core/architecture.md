@@ -114,7 +114,7 @@ which is why the orb is a button rather than an autoplaying page.
 
 ## Tool calling
 
-Callisto exposes three functions to the model, defined in
+Callisto exposes four functions to the model, defined in
 [`apps/server/src/tools/`](../../apps/server/src/tools):
 
 | Tool | Effect |
@@ -122,6 +122,17 @@ Callisto exposes three functions to the model, defined in
 | `open_url` | Opens one of the `CALLISTO_LINKS` destinations in a new tab |
 | `send_mailto` | Opens the user's mail client with a drafted message **to the owner** |
 | `check_popup` | Asks the browser whether popups are currently allowed |
+| `scatter_orb` | Flings the orb's particles across the viewport and reassembles them |
+
+`scatter_orb` is the odd one out: it changes nothing on the server and is
+answered immediately, because making the model wait on a decorative animation
+would only stall the conversation the animation decorates. The browser promotes
+the orb's canvas to a full-viewport overlay for the ~2.7s it runs, keeping the
+orb's screen position and radius identical so the promotion itself is invisible.
+It is only offered when architecture disclosure is on. The description keeps it
+to turns actually about the interface — an orb that scatters unprompted reads as
+a rendering bug rather than a flourish — while explicitly allowing repeats on
+request, and forbidding the model from announcing it first.
 
 `open_url` is built per session rather than declared once. Its enum comes from
 `CALLISTO_LINKS`, so the destinations the model may name are exactly the ones

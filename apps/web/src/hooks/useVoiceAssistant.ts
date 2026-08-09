@@ -16,6 +16,12 @@ interface VoiceAssistantState {
   /** Spectral centroid 0–1: proxy for dominant pitch (higher = brighter/higher pitch). */
   inputPitch: number;
   outputPitch: number;
+  /**
+   * Bumped each time the model asks for the orb flourish. A counter rather than
+   * a boolean so a second request retriggers the animation instead of being
+   * swallowed as "already true".
+   */
+  scatterToken: number;
 }
 
 export function useVoiceAssistant() {
@@ -26,6 +32,7 @@ export function useVoiceAssistant() {
     outputVolume: 0,
     inputPitch: 0,
     outputPitch: 0,
+    scatterToken: 0,
   });
 
   // ── Refs (avoid stale closures in audio callbacks) ───────────────────────
@@ -211,6 +218,10 @@ export function useVoiceAssistant() {
           }
           break;
 
+        case 'scatter_orb':
+          setState((prev) => ({ ...prev, scatterToken: prev.scatterToken + 1 }));
+          break;
+
         case 'send_mailto':
           if (msg.mailtoUrl) {
             // Use a hidden anchor click — avoids navigating the current page
@@ -339,6 +350,7 @@ export function useVoiceAssistant() {
     outputVolume: state.outputVolume,
     inputPitch: state.inputPitch,
     outputPitch: state.outputPitch,
+    scatterToken: state.scatterToken,
     connect,
     disconnect,
     isConnected: state.connectionState === ConnectionState.CONNECTED,

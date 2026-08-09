@@ -27,6 +27,8 @@ export class GeminiService {
   public onSendMailto: (mailtoUrl: string) => void = () => {};
   /** Fired when the model calls check_popup. Caller must later invoke resolveCheckPopup(). */
   public onCheckPopup: (callId: string) => void = () => {};
+  /** Fired when the model calls scatter_orb. Purely a cue for the browser. */
+  public onScatterOrb: () => void = () => {};
 
   constructor(apiKey: string) {
     this.ai = new GoogleGenAI({ apiKey });
@@ -162,6 +164,24 @@ export class GeminiService {
           });
 
           this.onSendMailto(mailtoUrl);
+
+        } else if (call.name === 'scatter_orb') {
+          // Answered immediately: the animation is decorative, so making the
+          // model wait on it would only stall the conversation it decorates.
+          //
+          // The id is coerced rather than passed through: a functionResponse
+          // carrying `undefined` is malformed, and the Live API answers a
+          // malformed response by closing the session — which the controller
+          // then propagates to the browser as a dropped connection.
+          this.session?.sendToolResponse({
+            functionResponses: [{
+              id: call.id ?? '',
+              name: call.name,
+              response: { output: { success: true } },
+            }],
+          });
+
+          this.onScatterOrb();
 
         } else if (call.name === 'check_popup') {
           // Response is deferred — the controller will call resolveCheckPopup()

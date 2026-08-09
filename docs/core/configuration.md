@@ -81,11 +81,27 @@ be spoken aloud.
 
 **What the briefing permits.** The core streaming-audio decision and why
 barge-in works; the shape of the monorepo and what each half is responsible for;
-the orb being driven by the real signal; each tool and what it does, including
-why the popup check holds a model turn open; that sessions are origin-gated and
-rate-limited; and that her persona and links are configuration rather than code.
-She is told to lead with the one idea that matters, keep it to a few spoken
-sentences, and offer to go deeper instead of lecturing.
+each tool and what it does, including why the popup check holds a model turn
+open; that sessions are origin-gated and rate-limited; and that her persona and
+links are configuration rather than code. She is told to lead with the one idea
+that matters, keep it to a few spoken sentences, and offer to go deeper instead
+of lecturing.
+
+**The interface, too.** She can explain the orb — including that its palette
+comes from NASA's enhanced-colour imagery of the moon she is named for, where
+cyan marks fresh water ice at young impact craters and red marks the ancient
+irradiated crust — that it moves with the real audio rather than on a loop, and
+what the two transcript panels are.
+
+Enabling disclosure also hands her the `scatter_orb` tool, which flings the
+particles across the viewport while she talks. She is told to fire it *silently*
+while describing the orb — never announcing the ability, asking permission, or
+mentioning that a tool exists — and to repeat it whenever asked, with no limit.
+A demonstration that gets introduced first is a menu, not a demonstration.
+
+**And to be obliging.** Anything she is permitted to do, she does the moment it
+is asked: no hedging, no making a visitor ask twice, no explaining that she
+could. Refusal is reserved for the withheld list, and stays warm even there.
 
 **What it forbids**, even under persistent asking: credentials, secrets and
 configuration values; anything about where she is deployed — provider, server,

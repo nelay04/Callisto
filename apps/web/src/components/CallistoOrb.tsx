@@ -10,26 +10,59 @@ interface Particle {
   size: number;
   randomOffset: number;
   speed: number;
+  /** Direction this particle flies during the scatter flourish, in radians. */
+  scatterAngle: number;
+  /** How far along that direction, as a fraction of the viewport diagonal. */
+  scatterReach: number;
 }
+
+/** Scatter timeline, in milliseconds from the moment it is triggered. */
+const SCATTER = { out: 700, hold: 1100, back: 900 } as const;
+const SCATTER_TOTAL = SCATTER.out + SCATTER.hold + SCATTER.back;
+
+// The canvas sits inside the orb's square normally, and is promoted to a
+// full-viewport overlay for the duration of the flourish.
+const CANVAS_INLINE = 'absolute inset-0 w-full h-full';
+const CANVAS_OVERLAY = 'fixed inset-0 z-50 pointer-events-none';
 
 interface CallistoOrbProps {
   /** Current audio level 0–1. Drives particle displacement and glow. */
   audioLevel?: number;
   /** Whether a live session is active (affects glow intensity). */
   isActive?: boolean;
+  /**
+   * Increment to fling the particles across the viewport and reassemble them.
+   * A counter rather than a boolean, so repeat triggers replay the animation.
+   */
+  scatterToken?: number;
   onClick?: () => void;
 }
 
 export default function CallistoOrb({
   audioLevel = 0,
   isActive = false,
+  scatterToken = 0,
   onClick,
 }: CallistoOrbProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const particlesRef = useRef<Particle[]>([]);
   const timeRef = useRef(0);
   const audioRef = useRef(0);
   const rafRef = useRef(0);
+  const scatterStartRef = useRef<number | null>(null);
+
+  // While scattering, the canvas is promoted to a full-viewport overlay so the
+  // particles are not clipped by the small square the orb normally occupies.
+  // The orb itself keeps its exact screen position, so the promotion is
+  // invisible — only the drawable area changes.
+  //
+  // Driven through the DOM rather than React state: the canvas is an external
+  // system, and re-rendering to move it would tear down the animation loop
+  // mid-flourish.
+  const overlayRef = useRef(false);
+  const geometryRef = useRef({ cx: 0, cy: 0, r: 0 });
+  const resizeRef = useRef<() => void>(() => {});
 
   // ── Build particle sphere once ───────────────────────────────────────────
   useEffect(() => {
@@ -74,6 +107,8 @@ export default function CallistoOrb({
         size,
         randomOffset: Math.random() * Math.PI * 2,
         speed: 0.5 + Math.random(),
+        scatterAngle: Math.random() * Math.PI * 2,
+        scatterReach: 0.15 + Math.random() * 0.85,
       });
     }
 
@@ -85,6 +120,28 @@ export default function CallistoOrb({
     audioRef.current = audioLevel;
   }, [audioLevel]);
 
+  // ── Scatter flourish ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (scatterToken <= 0 || !canvas) return;
+
+    scatterStartRef.current = performance.now();
+    overlayRef.current = true;
+    canvas.className = CANVAS_OVERLAY;
+    resizeRef.current();
+
+    // Drop back out of overlay once the particles are home. Kept slightly
+    // longer than the animation so the final frame is never clipped.
+    const id = setTimeout(() => {
+      scatterStartRef.current = null;
+      overlayRef.current = false;
+      canvas.className = CANVAS_INLINE;
+      resizeRef.current();
+    }, SCATTER_TOTAL + 120);
+
+    return () => clearTimeout(id);
+  }, [scatterToken]);
+
   // ── Render loop ──────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -93,17 +150,43 @@ export default function CallistoOrb({
     if (!ctx) return;
 
     const resize = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = parent.clientWidth * dpr;
-      canvas.height = parent.clientHeight * dpr;
+      const wrapper = wrapperRef.current;
+      if (!wrapper) return;
+
+      const rect = wrapper.getBoundingClientRect();
+
+      // Full-viewport at native DPR would quadruple the fill cost on a retina
+      // display, for ~2.7s of fast-moving particles where nobody can see the
+      // extra resolution. Capping it keeps the main thread responsive — a
+      // stalled tab starves the microphone callback and looks like a dropped
+      // connection.
+      const dpr = overlayRef.current ? 1 : window.devicePixelRatio || 1;
+
+      // In overlay mode the canvas spans the viewport, so the orb's centre is
+      // the wrapper's centre in viewport coordinates rather than the middle of
+      // the canvas. The radius comes from the wrapper either way, which is what
+      // keeps the orb the same size across the switch.
+      const w = overlayRef.current ? window.innerWidth : rect.width;
+      const h = overlayRef.current ? window.innerHeight : rect.height;
+
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
       ctx.scale(dpr, dpr);
-      canvas.style.width = `${parent.clientWidth}px`;
-      canvas.style.height = `${parent.clientHeight}px`;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+
+      geometryRef.current = {
+        cx: overlayRef.current ? rect.left + rect.width / 2 : rect.width / 2,
+        cy: overlayRef.current ? rect.top + rect.height / 2 : rect.height / 2,
+        r: Math.min(rect.width, rect.height) * 0.38,
+      };
     };
 
+    resizeRef.current = resize;
+
     window.addEventListener('resize', resize);
+    // Also on scroll: in overlay mode the orb's centre is a viewport coordinate.
+    window.addEventListener('scroll', resize, { passive: true });
     resize();
 
     const render = () => {
@@ -115,10 +198,27 @@ export default function CallistoOrb({
       const h = canvas.clientHeight;
       ctx.clearRect(0, 0, w, h);
 
-      const cx = w / 2;
-      const cy = h / 2;
-      const baseR = Math.min(w, h) * 0.38;
+      const { cx, cy, r: baseR } = geometryRef.current;
       const R = baseR * (1 + audio * 0.05);
+
+      // 0 while idle, 1 at full spread. Ease out on the way apart and ease in
+      // on the way home, so the particles leave fast and settle rather than
+      // snapping back into the sphere.
+      let scatter = 0;
+      if (scatterStartRef.current !== null) {
+        const e = performance.now() - scatterStartRef.current;
+        if (e < SCATTER.out) {
+          const k = e / SCATTER.out;
+          scatter = 1 - Math.pow(1 - k, 3);
+        } else if (e < SCATTER.out + SCATTER.hold) {
+          scatter = 1;
+        } else if (e < SCATTER_TOTAL) {
+          const k = (e - SCATTER.out - SCATTER.hold) / SCATTER.back;
+          scatter = 1 - (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+        }
+      }
+
+      const reach = Math.hypot(w, h) * 0.55;
 
       const rotY = t * 0.2;
       const rotX = Math.sin(t * 0.1) * 0.1;
@@ -137,11 +237,23 @@ export default function CallistoOrb({
         const y2 = y0 * cosX - z1 * sinX;
         const z2 = z1 * cosX + y0 * sinX;
 
-        if (z2 > -0.2) {
+        // Back-face culling is skipped mid-scatter: hidden particles are part
+        // of the cloud once the sphere has come apart, and popping them in at
+        // the end would read as a glitch.
+        if (z2 > -0.2 || scatter > 0.02) {
           const persp = 1 + z2 * 0.3;
-          const sx = cx + x1 * R * persp;
-          const sy = cy + y2 * R * persp;
+          let sx = cx + x1 * R * persp;
+          let sy = cy + y2 * R * persp;
           const sz = p.size * persp * (1 + audio * 0.2);
+
+          if (scatter > 0) {
+            // Each particle drifts slowly while dispersed, so the held phase is
+            // a floating cloud rather than a frozen still.
+            const drift = t * 6 * p.speed + p.randomOffset;
+            const d = reach * p.scatterReach * scatter;
+            sx += Math.cos(p.scatterAngle + Math.sin(drift) * 0.15) * d;
+            sy += Math.sin(p.scatterAngle + Math.cos(drift) * 0.15) * d;
+          }
 
           ctx.fillStyle = p.color;
           ctx.beginPath();
@@ -157,12 +269,14 @@ export default function CallistoOrb({
 
     return () => {
       window.removeEventListener('resize', resize);
+      window.removeEventListener('scroll', resize);
       cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
   return (
     <div
+      ref={wrapperRef}
       className="relative w-full aspect-square cursor-pointer"
       onClick={onClick}
       role="button"
@@ -170,7 +284,7 @@ export default function CallistoOrb({
     >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
+        className={CANVAS_INLINE}
         style={{
           filter: `drop-shadow(0 0 ${isActive ? 50 : 30}px rgba(0,0,0,0.85))`,
           transition: 'filter 0.6s ease',
