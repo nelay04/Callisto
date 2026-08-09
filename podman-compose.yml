@@ -7,12 +7,16 @@
 # Then open http://127.0.0.1:3012
 #
 # Written for `podman compose` (which delegates to the docker-compose binary).
-# It is deliberately NOT interchangeable with docker-compose.yml: `network_mode:
-# pasta` below is Podman-specific and Docker will reject it.
 #
 # Kept distinct from the Docker stack on every axis that could collide on a
 # shared host — project name, image tags, container names — so both can exist
 # side by side. They still bind the same two ports, so only one runs at a time.
+#
+# The one structural difference from docker-compose.yml: these services use
+# host networking and bind 127.0.0.1 directly, instead of publishing a mapped
+# port. See the note on the server service for why. Consequence worth knowing:
+# there is no `ports:` mapping here, so the ports come *only* from PORT in each
+# app's .env — change it there and nothing else needs editing.
 
 name: callisto-podman
 
@@ -26,18 +30,28 @@ services:
     pull_policy: build
     restart: unless-stopped
 
-    # Rootless userspace networking, no bridge and no network to create.
+    # The container shares the host's network namespace, so the process binds
+    # the host's 127.0.0.1 directly. No bridge, no port publishing, no
+    # userspace forwarder — HOST below is literally the address it listens on.
     #
-    # Affordable here because the two services never talk to each other — the
-    # browser is the server's only client — so nothing needs service-name DNS.
-    # Two benefits on a busy host: one less bridge network among the ones
-    # already there, and no dependency on netavark's ability to program
-    # nftables, which is unavailable on some kernels (WSL2 among them) and is
-    # the usual cause of "netavark: nftables error" on `up`.
+    # Chosen over the two alternatives because both fail on this stack:
     #
-    # Swap to the default bridge by deleting this line from both services if
-    # you ever add container-to-container traffic.
-    network_mode: pasta
+    #   • bridge (the Compose default) needs netavark to program nftables,
+    #     which is unavailable on some kernels — WSL2 among them — and fails
+    #     with `netavark: nftables error ... "nft" did not return successfully`.
+    #   • pasta avoids nftables, but starting two containers at once races:
+    #     one pasta instance intermittently fails to spawn, and because the
+    #     healthcheck runs *inside* the container's own namespace, the result
+    #     is a container reporting `healthy` while unreachable from the host.
+    #     A silent, intermittent outage is worse than either alternative.
+    #
+    # Host networking also makes the healthcheck meaningful: it probes the same
+    # address a client uses, rather than a namespace-local one.
+    #
+    # The trade-off is no network isolation from the host. Acceptable here —
+    # the containers are rootless, still isolated by PID and mount namespace,
+    # and both bind loopback only.
+    network_mode: host
 
     # The same file `npm run dev` reads. Nothing is duplicated into this file:
     # GEMINI_API_KEY, CORS_ORIGIN, MAX_SESSIONS_PER_IP, the profile links and
@@ -46,17 +60,11 @@ services:
 
     environment:
       NODE_ENV: production
-      # Overrides the .env value, and must: a published port cannot reach a
-      # process bound to the container's own loopback. Host-side exposure is
-      # still loopback-only — see the 127.0.0.1 prefix below.
-      HOST: 0.0.0.0
-
-    # Loopback only. The browser reaches this through a reverse proxy in
-    # production; nothing is served to the network directly.
-    # The container-side port tracks PORT in apps/server/.env — change one and
-    # change the other.
-    ports:
-      - "127.0.0.1:3013:3013"
+      # Overrides the image's 0.0.0.0 back to loopback. On host networking this
+      # is the host's own 127.0.0.1, so the port is reachable from this machine
+      # and nowhere else — no `ports:` mapping is involved, and none would be
+      # honoured. The port itself comes from PORT in apps/server/.env.
+      HOST: 127.0.0.1
 
   web:
     build:
@@ -73,7 +81,9 @@ services:
     container_name: callisto-podman-web
     pull_policy: build
     restart: unless-stopped
-    network_mode: pasta
+
+    # See the long note on the server service for why host networking.
+    network_mode: host
 
     # Ordering only. The web container never calls the server — the browser
     # does — so there is no runtime dependency between them.
@@ -85,9 +95,6 @@ services:
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
-      # See the note on the server service — same reasoning, and Next's
-      # standalone server reads HOSTNAME rather than HOST.
-      HOSTNAME: 0.0.0.0
-
-    ports:
-      - "127.0.0.1:3012:3012"
+      # Same reasoning as the server's HOST, except Next's standalone server
+      # reads HOSTNAME. The port comes from PORT in apps/web/.env.
+      HOSTNAME: 127.0.0.1
