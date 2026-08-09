@@ -43,11 +43,17 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-server.listen(config.PORT, () => {
-  console.log(`Callisto API     → http://localhost:${config.PORT}`);
-  console.log(`WebSocket        → ws://localhost:${config.PORT}/ws/session`);
-  console.log(`Health           → http://localhost:${config.PORT}/health`);
-  console.log(`Session info     → http://localhost:${config.PORT}/api/v1/session/info`);
+server.listen(config.PORT, config.HOST, () => {
+  // 0.0.0.0 is not a dialable address — print loopback in that case so the
+  // logged URLs are ones you can actually paste into a browser.
+  const shown = config.HOST === '0.0.0.0' ? '127.0.0.1' : config.HOST;
+  const origin = `${shown}:${config.PORT}`;
+
+  console.log(`Callisto API     → http://${origin}`);
+  console.log(`WebSocket        → ws://${origin}/ws/session`);
+  console.log(`Health           → http://${origin}/health`);
+  console.log(`Session info     → http://${origin}/api/v1/session/info`);
+  console.log(`Bound to         → ${config.HOST}:${config.PORT}`);
   console.log(`Allowed origins  → ${config.CORS_ORIGIN.join(', ')}`);
 });
 

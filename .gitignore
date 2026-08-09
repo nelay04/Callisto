@@ -5,9 +5,8 @@ dist/
 next-env.d.ts
 
 # Environment
+# Each app is configured by a single .env; only the .example files are tracked.
 .env
-.env.local
-.env.*.local
 
 # Logs
 *.log
@@ -19,4 +18,8 @@ coverage/
 # Editor / OS
 .DS_Store
 .idea/
-.vscode/
+
+# Personal editor state stays out, but the shared extension recommendations
+# are tracked — they are only useful if everyone gets them.
+.vscode/*
+!.vscode/extensions.json

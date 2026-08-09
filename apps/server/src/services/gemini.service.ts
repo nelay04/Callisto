@@ -1,6 +1,6 @@
 import { GoogleGenAI, type LiveServerMessage, type Session } from '@google/genai';
 import type { TranscriptRole } from '@callisto/protocol';
-import { GEMINI_MODEL, GEMINI_LIVE_CONFIG } from '../config/gemini';
+import { GEMINI_MODEL, getGeminiLiveConfig } from '../config/gemini';
 import { resolveContactUrl } from '../tools/openUrl.tool';
 import { buildMailtoUrl } from '../tools/mailto.tool';
 
@@ -36,7 +36,7 @@ export class GeminiService {
   async connect(): Promise<void> {
     this.session = await this.ai.live.connect({
       model: GEMINI_MODEL,
-      config: GEMINI_LIVE_CONFIG,
+      config: getGeminiLiveConfig(),
       callbacks: {
         onopen: () => this.onReady(),
         onmessage: (msg: LiveServerMessage) => this.handleMessage(msg),

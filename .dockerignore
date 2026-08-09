@@ -3,8 +3,8 @@
 **/dist
 **/coverage
 **/*.tsbuildinfo
+# Secrets never enter an image layer — the compose files inject .env at run time.
 **/.env
-**/.env.local
 .git
 .github
 **/*.md

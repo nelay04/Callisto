@@ -4,9 +4,10 @@ Thanks for taking a look. Issues and pull requests are welcome.
 
 ## Getting set up
 
-See the [quickstart](README.md#quickstart). You need Node 22+ and your own
-[Gemini API key](https://aistudio.google.com/apikey) — there is no shared test
-credential.
+See the [quickstart](README.md#quickstart), or
+[docs/core/running.md](docs/core/running.md) for Docker and Podman. You need
+Node 22+ and your own [Gemini API key](https://aistudio.google.com/apikey) —
+there is no shared test credential.
 
 ## Before opening a pull request
 
@@ -17,7 +18,13 @@ npm test
 npm run build
 ```
 
-CI runs exactly these, plus a build of both Docker images.
+CI runs exactly these, plus a build of both container images and a parse of
+both compose stacks against the tracked `.env.example` files.
+
+If you touch `CALLISTO_SYSTEM_PROMPT` in `apps/server/.env.example`, keep it a
+single double-quoted value with inner quotes escaped as `\"` — CI asserts the
+prompt still survives Compose's `env_file` parser, since a truncated system
+prompt has no other visible symptom.
 
 ## What the tests cover — and what they don't
 
@@ -28,7 +35,7 @@ control. There are deliberately **no** tests that mock the Gemini Live session
 
 So anything touching audio or the live session needs a manual pass:
 
-1. `npm run dev`, open <http://localhost:3000>, allow the microphone.
+1. `npm run dev`, open <http://127.0.0.1:3012>, allow the microphone.
 2. Say something. Confirm you hear a reply and both sides appear in the
    transcript panel as coherent turns, not word-by-word fragments.
 3. Talk over Callisto mid-reply. Playback should stop immediately.

@@ -5,9 +5,9 @@
   "description": "Callisto web client — Next.js voice interface with a reactive audio orb",
   "license": "MIT",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "node scripts/next-with-env.mjs dev --turbopack --hostname 127.0.0.1",
     "build": "next build --turbopack",
-    "start": "next start",
+    "start": "node scripts/next-with-env.mjs start --hostname 127.0.0.1",
     "lint": "eslint .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

@@ -1,25 +1,43 @@
-# Docker stack for Callisto. See docs/core/running.md for the full guide.
+# Podman stack for Callisto. See docs/core/running.md for the full guide.
 #
 #   cp apps/server/.env.example apps/server/.env   # add your Gemini API key
 #   cp apps/web/.env.example    apps/web/.env
-#   npm run docker:up
+#   npm run podman:up
 #
 # Then open http://127.0.0.1:3012
 #
-# Both images build from the repo root so npm workspaces resolve correctly.
-# For Podman use podman-compose.yml — the two stacks are deliberately separate.
+# Written for `podman compose` (which delegates to the docker-compose binary).
+# It is deliberately NOT interchangeable with docker-compose.yml: `network_mode:
+# pasta` below is Podman-specific and Docker will reject it.
+#
+# Kept distinct from the Docker stack on every axis that could collide on a
+# shared host — project name, image tags, container names — so both can exist
+# side by side. They still bind the same two ports, so only one runs at a time.
 
-# Pinned rather than derived from the directory name, so containers, networks
-# and volumes are namespaced predictably on a host running other projects.
-name: callisto
+name: callisto-podman
 
 services:
   server:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
-    image: callisto/server:latest
+    image: callisto/server:podman
+    container_name: callisto-podman-server
+    pull_policy: build
     restart: unless-stopped
+
+    # Rootless userspace networking, no bridge and no network to create.
+    #
+    # Affordable here because the two services never talk to each other — the
+    # browser is the server's only client — so nothing needs service-name DNS.
+    # Two benefits on a busy host: one less bridge network among the ones
+    # already there, and no dependency on netavark's ability to program
+    # nftables, which is unavailable on some kernels (WSL2 among them) and is
+    # the usual cause of "netavark: nftables error" on `up`.
+    #
+    # Swap to the default bridge by deleting this line from both services if
+    # you ever add container-to-container traffic.
+    network_mode: pasta
 
     # The same file `npm run dev` reads. Nothing is duplicated into this file:
     # GEMINI_API_KEY, CORS_ORIGIN, MAX_SESSIONS_PER_IP, the profile links and
@@ -51,8 +69,11 @@ services:
         # reverse proxy these become wss://your-domain/ws/session.
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://127.0.0.1:3013/ws/session}
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:3013}
-    image: callisto/web:latest
+    image: callisto/web:podman
+    container_name: callisto-podman-web
+    pull_policy: build
     restart: unless-stopped
+    network_mode: pasta
 
     # Ordering only. The web container never calls the server — the browser
     # does — so there is no runtime dependency between them.
@@ -70,10 +91,3 @@ services:
 
     ports:
       - "127.0.0.1:3012:3012"
-
-# Named explicitly so it is identifiable among the other networks on the host.
-# The two services do not talk to each other over it; Compose requires a
-# default network regardless.
-networks:
-  default:
-    name: callisto_net

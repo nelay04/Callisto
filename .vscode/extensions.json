@@ -1,0 +1,36 @@
+{
+  // Suggested when someone opens this repo. VS Code shows these as a prompt;
+  // nothing is installed automatically.
+  "recommendations": [
+    // Schema validation for docker-compose.yml, podman-compose.yml and
+    // .github/workflows/ci.yml.
+    "redhat.vscode-yaml",
+
+    // Formatting for the markdown in docs/core/ and the READMEs.
+    "mistx.pretty-markdown",
+
+    // Flat configs live in apps/*/eslint.config.mjs. `npm run lint` stays the
+    // source of truth; this surfaces the same rules inline.
+    "dbaeumer.vscode-eslint",
+
+    // Highlighting for the .env files. Earns its place because
+    // CALLISTO_SYSTEM_PROMPT is a ~5,500-character multi-line quoted value,
+    // where a lost closing quote is otherwise invisible until runtime.
+    "mikestead.dotenv",
+
+    // Tailwind 4 keeps its config in CSS (apps/web/src/app/globals.css), so
+    // class completion comes from here rather than a tailwind.config.js.
+    "bradlc.vscode-tailwindcss",
+
+    // Dockerfile authoring and linting for apps/*/Dockerfile.
+    "ms-azuretools.vscode-docker",
+
+    // Container Tools — the split-out successor to the Docker extension's
+    // container management. Handles the Podman stack as well as Docker.
+    "ms-azuretools.vscode-containers"
+  ],
+
+  // Prettier is deliberately absent: the repo has no Prettier config, so
+  // format-on-save would reformat every file against defaults nobody chose.
+  "unwantedRecommendations": []
+}

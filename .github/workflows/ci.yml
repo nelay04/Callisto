@@ -41,8 +41,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_WS_URL: ws://localhost:3001/ws/session
-          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_WS_URL: ws://127.0.0.1:3013/ws/session
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3013
 
   docker:
     name: Docker images
@@ -71,7 +71,34 @@ jobs:
           file: apps/web/Dockerfile
           push: false
           build-args: |
-            NEXT_PUBLIC_WS_URL=ws://localhost:3001/ws/session
-            NEXT_PUBLIC_API_URL=http://localhost:3001
+            NEXT_PUBLIC_WS_URL=ws://127.0.0.1:3013/ws/session
+            NEXT_PUBLIC_API_URL=http://127.0.0.1:3013
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Both stacks must stay parseable from the .env.example files the README
+      # tells you to copy. The Podman file is validated with the same binary
+      # `podman compose` shells out to, so this covers it without installing
+      # Podman on the runner.
+      - name: Validate compose stacks
+        run: |
+          cp apps/server/.env.example apps/server/.env
+          cp apps/web/.env.example apps/web/.env
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f podman-compose.yml config --quiet
+
+      # CALLISTO_SYSTEM_PROMPT is a multi-line value with escaped quotes — the
+      # one thing in .env that a parser change could silently truncate.
+      - name: Check the system prompt survives env_file parsing
+        run: |
+          docker compose -f docker-compose.yml config --format json \
+            | node -e "
+              let d = '';
+              process.stdin.on('data', (c) => (d += c)).on('end', () => {
+                const p = JSON.parse(d).services.server.environment.CALLISTO_SYSTEM_PROMPT;
+                if (!p || p.length < 4000) {
+                  throw new Error('system prompt did not survive env_file parsing: ' + (p ? p.length : 0) + ' chars');
+                }
+                console.log('system prompt ok —', p.length, 'chars');
+              });
+            "

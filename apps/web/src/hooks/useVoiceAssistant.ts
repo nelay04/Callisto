@@ -6,7 +6,7 @@ import { ConnectionState, type Turn, type ClientMessage } from '@/types';
 import { createPcmBase64, decodeBase64ToPCM } from '@/lib/audioUtils';
 import { appendTranscript } from '@/lib/transcript';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:3001/ws/session';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://127.0.0.1:3013/ws/session';
 
 interface VoiceAssistantState {
   connectionState: ConnectionState;

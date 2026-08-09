@@ -24,7 +24,11 @@
     "build": "npm run build -w @callisto/protocol && npm run build -w @callisto/server && npm run build -w @callisto/web",
     "test": "npm run build -w @callisto/protocol && npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run build -w @callisto/protocol && npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run build -w @callisto/protocol && npm run typecheck --workspaces --if-present",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "podman:up": "podman compose -f podman-compose.yml up --build",
+    "podman:down": "podman compose -f podman-compose.yml down"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
