@@ -1,6 +1,7 @@
 import { GoogleGenAI, type LiveServerMessage, type Session } from '@google/genai';
 import type { TranscriptRole } from '@callisto/protocol';
 import { GEMINI_MODEL, getGeminiLiveConfig } from '../config/gemini';
+import { getGreetingPrompt } from '../prompts/callisto.prompt';
 import { resolveContactUrl } from '../tools/openUrl.tool';
 import { buildMailtoUrl } from '../tools/mailto.tool';
 
@@ -43,6 +44,26 @@ export class GeminiService {
         onclose: () => this.onClose(),
         onerror: (e: unknown) => this.onError(new Error(String(e))),
       },
+    });
+
+    // Make Callisto speak first. This has to happen *after* the await, not in
+    // onopen: the SDK fires onopen just before connect() resolves, so at that
+    // point this.session is still null and the turn would be dropped silently.
+    const greeting = getGreetingPrompt();
+    if (greeting) this.sendTextTurn(greeting);
+  }
+
+  /**
+   * Send a text turn as the user and close it, so the model responds
+   * immediately. Used for the greeting; audio input goes through sendAudio().
+   *
+   * Unlike audio, this produces no inputTranscription, so the text never
+   * surfaces in the visitor's transcript panel.
+   */
+  sendTextTurn(text: string): void {
+    this.session?.sendClientContent({
+      turns: [{ role: 'user', parts: [{ text }] }],
+      turnComplete: true,
     });
   }
 

@@ -99,6 +99,19 @@ and an `interrupted` message stops every scheduled source at once.
 supported. It is deprecated; `AudioWorklet` is the modern replacement and the
 natural next change.
 
+### Who speaks first
+
+Callisto does. A Live session that has received nothing produces nothing, so
+the server sends `CALLISTO_GREETING` as a closed user turn the instant the
+session opens, and the model answers into an empty room.
+
+The send has to happen *after* `live.connect()` resolves rather than inside its
+`onopen` callback — the SDK fires `onopen` just before resolving, while the
+service's session handle is still null, so a turn sent there would be dropped
+without an error. Both audio playback and the greeting depend on the browser's
+`AudioContext` having been created inside the click that starts a session,
+which is why the orb is a button rather than an autoplaying page.
+
 ## Tool calling
 
 Callisto exposes three functions to the model, defined in

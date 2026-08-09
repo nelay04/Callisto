@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { getSystemPrompt, unescapeEnvValue } from './callisto.prompt';
+import {
+  DEFAULT_GREETING,
+  getGreetingPrompt,
+  getSystemPrompt,
+  unescapeEnvValue,
+} from './callisto.prompt';
 
 const ORIGINAL = { ...process.env };
 
@@ -57,5 +62,36 @@ describe('getSystemPrompt', () => {
 
     process.env.CALLISTO_SYSTEM_PROMPT = 'Second persona.';
     expect(getSystemPrompt()).toBe('Second persona.');
+  });
+});
+
+describe('getGreetingPrompt', () => {
+  it('falls back to the default when unset', () => {
+    // Greeting on connect is the default behaviour: a visitor who has just
+    // granted microphone access should hear something without speaking first.
+    delete process.env.CALLISTO_GREETING;
+    expect(getGreetingPrompt()).toBe(DEFAULT_GREETING);
+  });
+
+  it('treats a blank value as "stay silent", not as "use the default"', () => {
+    // The one way to switch greeting off. An unset variable must not collapse
+    // into the same case, or disabling it would be impossible.
+    process.env.CALLISTO_GREETING = '';
+    expect(getGreetingPrompt()).toBe('');
+
+    process.env.CALLISTO_GREETING = '   ';
+    expect(getGreetingPrompt()).toBe('');
+  });
+
+  it('reads an override from the environment, unescaped and trimmed', () => {
+    process.env.CALLISTO_GREETING = '\n  Say \\"hello\\" and stop.  \n';
+    expect(getGreetingPrompt()).toBe('Say "hello" and stop.');
+  });
+
+  it('instructs rather than scripts, so the persona owns the wording', () => {
+    // A literal line here would be spoken verbatim by every persona this repo
+    // is ever repurposed for — including ones not named Callisto.
+    expect(DEFAULT_GREETING).not.toMatch(/Callisto/i);
+    expect(DEFAULT_GREETING).toMatch(/do not mention/i);
   });
 });

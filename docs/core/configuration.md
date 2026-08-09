@@ -37,6 +37,7 @@ commit or an image layer.
 | `NODE_ENV` | | `development` | |
 | `CORS_ORIGIN` | | `http://127.0.0.1:3012,http://localhost:3012` | Comma-separated; gates CORS **and** WebSocket upgrades |
 | `MAX_SESSIONS_PER_IP` | | `3` | Concurrent Gemini sessions per client IP |
+| `CALLISTO_GREETING` | | *built-in instruction* | What Callisto is told to say on connect — see [below](#greeting-on-connect) |
 | `LINKEDIN_URL` / `GITHUB_URL` | | — | Targets for the `open_url` tool; omit one and Callisto says that profile isn't available |
 
 ### `HOST`, and why containers use `0.0.0.0`
@@ -54,6 +55,29 @@ the port is reachable from that machine and nowhere else.
 The browser sends whichever spelling you typed in the address bar, so the
 default lists both `127.0.0.1` and `localhost`. In production this becomes your
 single public origin — see [deployment.md](deployment.md).
+
+### Greeting on connect
+
+Callisto speaks first. The moment a session opens the server sends
+`CALLISTO_GREETING` as a user turn and closes it, which is what prompts the
+model to produce a turn of its own — otherwise nothing happens until the
+visitor talks, and a silent orb reads as a broken one.
+
+The value is an **instruction, not a script**. The wording of the greeting is
+decided by `CALLISTO_SYSTEM_PROMPT`, so a retuned persona greets in its own
+voice instead of reciting a line pinned here. Override it to change the brief:
+
+```dotenv
+CALLISTO_GREETING=Greet the visitor and immediately offer to walk them through the projects.
+```
+
+Two behaviours worth knowing:
+
+- **Unset** uses the built-in instruction. **Blank** switches greeting off, and
+  Callisto waits to be spoken to — the behaviour before this existed.
+- The trigger text is invisible to the visitor. Only audio input produces an
+  input transcription, so nothing appears in the transcript panel; the first
+  thing shown is Callisto's own reply.
 
 ---
 
