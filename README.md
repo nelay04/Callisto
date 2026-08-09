@@ -64,7 +64,7 @@ npm run docker:up        # or: npm run podman:up
 | [Architecture](docs/core/architecture.md) | How it fits together, the audio pipeline, tool calling, limitations |
 | [Running](docs/core/running.md) | Bare npm, Docker and Podman, plus troubleshooting |
 | [Configuration](docs/core/configuration.md) | Every environment variable, and the system prompt |
-| [Deployment](docs/core/deployment.md) | nginx, a domain, TLS, and what to expose |
+| [Deployment](docs/core/deployment.md) | nginx, a domain, TLS, what to expose, and the deploy workflows |
 | [Contributing](CONTRIBUTING.md) | Tests, conventions, manual QA pass |
 
 ## Repository layout
@@ -112,6 +112,12 @@ the PCM16 encode/decode round-trip, transcript-turn merging, protocol
 validation, WebSocket admission control, and system-prompt loading. Audio
 playback and the Gemini session itself are verified by hand — see
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Every workflow is manual, started from the Actions tab. `CI` runs the commands
+above plus a container build and a compose parse; `Deploy (Docker)` and
+`Deploy (Podman)` ship `main` to the VM over SSH. Nothing runs on push, and
+merging never deploys on its own — see
+[deployment.md](docs/core/deployment.md#shipping-updates).
 
 ## Making it yours
 

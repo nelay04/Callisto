@@ -1,12 +1,11 @@
 name: CI
 
+# Manual only. Start a run from the Actions tab, against whichever branch you
+# pick there — nothing runs on push or on a pull request.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
-# A new push to the same branch cancels the run still in flight.
+# A second run on the same branch cancels the one still in flight.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

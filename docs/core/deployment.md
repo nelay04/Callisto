@@ -166,6 +166,51 @@ are baked into the bundle and need a rebuild.
 
 ---
 
+## Shipping updates
+
+Two workflows deploy over SSH, one per container engine:
+
+| Workflow | Runs on the VM |
+|---|---|
+| `Deploy (Docker)` — [deploy-docker.yml](../../.github/workflows/deploy-docker.yml) | `docker compose -f docker-compose.yml up --build -d` |
+| `Deploy (Podman)` — [deploy-podman.yml](../../.github/workflows/deploy-podman.yml) | `podman compose -f podman-compose.yml up --build -d` |
+
+Both are **manual** — `workflow_dispatch`, started from the Actions tab, and
+guarded by `if: github.ref == 'refs/heads/main'` so picking another branch in
+the UI does nothing. Merging never ships on its own. They share one
+`concurrency` group, so a Docker run and a Podman run cannot race each other
+through `git reset` and a rebuild of the same checkout.
+
+Each run pulls `origin/main` with `git reset --hard`, checks the three `.env`
+files exist, rebuilds both images, prunes dangling ones, then polls
+`/health` and the web root for up to 60s — dumping `ps -a` and the last 50 log
+lines if the stack never answers. `reset --hard` only touches tracked files, so
+the `.env`s living on the VM survive every deploy.
+
+nginx is **not** touched. It runs on the host, outside both stacks, so a config
+change there is still `sudo nginx -t && sudo systemctl reload nginx` by hand.
+
+### Prerequisites on the VM
+
+- The repo cloned at `~/Projects/Typescript/Callisto` with an `origin` remote.
+- All three `.env` files present — root, `apps/server/`, `apps/web/`. The
+  deploy fails fast and names the missing one rather than building an image
+  with the wrong URLs baked in.
+- The matching engine installed. There is no Node toolchain requirement: both
+  images compile the workspaces internally, so the VM never runs npm.
+
+Three repository secrets: `CONTABO_VM_HOST`, `CONTABO_VM_USERNAME`,
+`CONTABO_VM_SSH_KEY`.
+
+### Pick one engine per host
+
+The two stacks are namespaced apart — project name, image tags, container
+names — so both can exist on one host. But they bind the same two ports, and
+deploying one does not stop the other; the second simply fails to bind. Choose
+an engine per host and keep using it.
+
+---
+
 ## Microphone access requires HTTPS
 
 `getUserMedia` is gated behind a secure context. Over plain `http://` on a
@@ -186,3 +231,4 @@ optional here. (`http://localhost` is exempt, which is why local dev works.)
 - [ ] `X-Forwarded-For` set, so the per-IP cap is per visitor
 - [ ] `GEMINI_API_KEY` set — a missing key crashes the server on the first upgrade
 - [ ] `MAX_SESSIONS_PER_IP` sized for your Gemini quota, not your traffic hopes
+- [ ] For automated deploys: the three `CONTABO_VM_*` secrets set, and the root `.env` present on the VM

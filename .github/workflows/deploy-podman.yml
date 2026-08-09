@@ -1,15 +1,21 @@
-name: CD Pipeline
+name: Deploy (Podman)
 
 # Manual only. Start a run from the Actions tab.
 #
 # There is no Node toolchain on the VM — every step below is a podman command.
 # Both images build from the repo root inside the container, so the runner
 # never needs npm either; it only opens an SSH session and drives podman.
+#
+# The Docker equivalent is deploy-docker.yml. The two stacks are namespaced
+# apart (project name, image tags, container names) but bind the same two
+# ports, so only one can be running — deploying one does not stop the other,
+# and the second will fail to bind. Pick one per host and stay with it.
 on:
   workflow_dispatch:
 
-# One deploy at a time. A second run waits rather than racing the first
-# through `git reset` and a rebuild of the same images.
+# One deploy at a time, across *both* deploy workflows — the shared group name
+# is deliberate, so a Docker run cannot race a Podman run through `git reset`
+# and a rebuild on the same checkout.
 concurrency:
   group: deploy-production
   cancel-in-progress: false

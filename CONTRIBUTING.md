@@ -21,6 +21,13 @@ npm run build
 CI runs exactly these, plus a build of both container images and a parse of
 both compose stacks against the tracked `.env.example` files.
 
+It is **manual**, though — the workflow is `workflow_dispatch`-only, so nothing
+runs automatically on a push or a pull request. Run the commands above locally,
+and start a CI run from the Actions tab when you want the container and compose
+checks too. Deployment is manual for the same reason: `Deploy (Docker)` and
+`Deploy (Podman)` are separate Actions-tab workflows, and merging never ships
+anything on its own.
+
 If you touch `CALLISTO_SYSTEM_PROMPT` in `apps/server/.env.example`, keep it a
 single double-quoted value with inner quotes escaped as `\"` — CI asserts the
 prompt still survives Compose's `env_file` parser, since a truncated system

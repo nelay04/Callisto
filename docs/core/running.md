@@ -122,6 +122,11 @@ npm run podman:up        # podman compose -f podman-compose.yml up --build
 npm run podman:down
 ```
 
+Both scripts are thin wrappers around the command in the comment. On a host
+with no Node installed — a deployment VM, typically — run that command
+directly; the images compile the workspaces internally, so nothing outside the
+container needs npm. This is what the deploy workflow does, adding `-d`.
+
 `podman compose` delegates to the `docker-compose` binary, which must be on
 `PATH`, and needs the Podman API socket running:
 
