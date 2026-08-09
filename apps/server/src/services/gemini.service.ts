@@ -13,6 +13,12 @@ export class GeminiService {
   private readonly ai: GoogleGenAI;
   private session: Session | null = null;
 
+  // The greeting may only be sent once the session reports setupComplete, and
+  // only once the session handle exists. Those two arrive in either order, so
+  // both paths call maybeSendGreeting() and these flags decide which one wins.
+  private setupComplete = false;
+  private greetingSent = false;
+
   // ── Event Callbacks ──────────────────────────────────────────────────────
   public onReady: () => void = () => {};
   public onAudioChunk: (base64PCM: string) => void = () => {};
@@ -48,10 +54,25 @@ export class GeminiService {
       },
     });
 
-    // Make Callisto speak first. This has to happen *after* the await, not in
-    // onopen: the SDK fires onopen just before connect() resolves, so at that
-    // point this.session is still null and the turn would be dropped silently.
+    this.maybeSendGreeting();
+  }
+
+  /**
+   * Send the opening turn, once, when it can actually be acted on.
+   *
+   * Sending it as soon as connect() resolves looked correct and mostly worked,
+   * but the socket being open is not the same as the session being ready: the
+   * server still has to acknowledge the setup message. A turn that arrives
+   * first is accepted and then answered with an empty generation — no audio,
+   * no transcript, no error. It presents as Callisto silently failing to greet,
+   * and it got steadily more likely as the system instruction grew, because a
+   * longer instruction takes longer to set up.
+   */
+  private maybeSendGreeting(): void {
+    if (this.greetingSent || !this.setupComplete || !this.session) return;
+
     const greeting = getGreetingPrompt();
+    this.greetingSent = true;
     if (greeting) this.sendTextTurn(greeting);
   }
 
@@ -103,6 +124,12 @@ export class GeminiService {
   // ── Private ───────────────────────────────────────────────────────────────
 
   private handleMessage(msg: LiveServerMessage): void {
+    // 0. Setup acknowledged — only now will the session act on a turn.
+    if (msg.setupComplete) {
+      this.setupComplete = true;
+      this.maybeSendGreeting();
+    }
+
     // 1. Audio output from Gemini (PCM16 at 24 kHz, base64-encoded)
     const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
     if (audioData) {

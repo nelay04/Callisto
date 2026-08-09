@@ -38,6 +38,8 @@ commit or an image layer.
 | `CORS_ORIGIN` | | `http://127.0.0.1:3012,http://localhost:3012` | Comma-separated; gates CORS **and** WebSocket upgrades |
 | `MAX_SESSIONS_PER_IP` | | `3` | Concurrent Gemini sessions per client IP |
 | `CALLISTO_GREETING` | | *built-in instruction* | What Callisto is told to say on connect — see [below](#greeting-on-connect) |
+| `CALLISTO_LANGUAGE` | | `English` | The language every session opens in — see [below](#language) |
+| `GEMINI_VOICE` | | `Leda` | Prebuilt Gemini voice |
 | `CALLISTO_LINKS` | | — | Everything the `open_url` tool can open — see [below](#links) |
 | `CALLISTO_EXPLAIN_ARCHITECTURE` | | `false` | Lets Callisto describe her own build — see [below](#explaining-herself) |
 | `CALLISTO_BUILDER_NAME` | | — | Who she names as her builder when she does |
@@ -156,6 +158,37 @@ Two behaviours follow from how it is wired:
 Malformed input throws at session start with a message naming the offending
 entry, rather than being skipped. A dropped link would otherwise fail silently
 at the exact moment a visitor asks to see the work.
+
+### Language
+
+`CALLISTO_LANGUAGE` is the language a session opens in, written as a name the
+model can act on — `English`, `Bengali`, `Hindi`. It is not hardcoded anywhere;
+English is only the fallback when the variable is unset.
+
+Callisto stays in it. She will not switch because a visitor used another
+language in passing, because a name in their sentence came from elsewhere, or
+because of an accent. An explicit request — "speak in Bengali", "banglay bolo",
+or the same request made in that language — switches her **completely and
+permanently**: the assumption is that the visitor is not comfortable in the
+configured language, so every word after that point is in the new one, including
+greetings and link descriptions. She does not translate herself, does not say
+each sentence twice, and does not drift back after a turn or two. Only another
+explicit request changes it again.
+
+> **The transcript language cannot be pinned.** `AudioTranscriptionConfig` has a
+> `languageCodes` hint in the SDK types, but it is a Vertex AI field — the
+> Gemini Developer API answers it with `languageCodes parameter is not
+> supported` and fails the whole `connect`, dropping the session. Transcription
+> language is therefore auto-detected per utterance, and the transcript panel
+> can flicker when speech is ambiguous. What Callisto *speaks* is unaffected;
+> that is governed by the policy above.
+
+### Voice
+
+`GEMINI_VOICE` picks the prebuilt voice. `Leda` is the youthful one and the
+register Callisto is written for; `Aoede` is breezier, `Zephyr` brighter, `Kore`
+firmer. It is fixed rather than left to the model's default so every visitor
+hears the same Callisto, and a change applies to the next session — no rebuild.
 
 ### Greeting on connect
 
