@@ -152,6 +152,24 @@ sequenceDiagram
 Without this, a blocked popup is invisible to the model and it cheerfully claims
 to have opened a link that never appeared.
 
+## She can explain herself
+
+`CALLISTO_EXPLAIN_ARCHITECTURE` appends a briefing to the system instruction
+that authorises Callisto to describe her own construction, crediting
+`CALLISTO_BUILDER_NAME`. Off by default.
+
+The interesting part is that the boundary is drawn in the briefing rather than
+left to the model's judgement. The repository is public and MIT-licensed, so its
+design is public — the streaming decision, the tools, the deferred `check_popup`
+turn, the shape of the monorepo. What is *not* public is the deployment: the
+briefing names credentials, configuration values, hosts, domains, ports,
+containers, paths and logs as things she declines, and tells her to decline once
+and warmly rather than argue. It also tells her to admit ignorance instead of
+guessing, since being caught inventing detail about herself would defeat the
+purpose.
+
+See [configuration.md](configuration.md#explaining-herself).
+
 ## Admission control
 
 The server is a public endpoint holding a metered credential, so two gates sit

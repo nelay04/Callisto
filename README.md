@@ -1,8 +1,6 @@
 # Callisto
 
-**A real-time voice assistant you talk to, not type at.** Speak, and Callisto
-answers in natural speech with sub-second latency — interrupting her mid-sentence
-works the way it does with a person.
+A real-time voice AI assistant with raw audio streaming over WebSocket, featuring seamless conversational flow, AI-driven orb visualization and browser-integrated tool execution.
 
 [![CI](https://github.com/nelay04/Callisto/actions/workflows/ci.yml/badge.svg)](https://github.com/nelay04/Callisto/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

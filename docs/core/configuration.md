@@ -39,6 +39,8 @@ commit or an image layer.
 | `MAX_SESSIONS_PER_IP` | | `3` | Concurrent Gemini sessions per client IP |
 | `CALLISTO_GREETING` | | *built-in instruction* | What Callisto is told to say on connect — see [below](#greeting-on-connect) |
 | `CALLISTO_LINKS` | | — | Everything the `open_url` tool can open — see [below](#links) |
+| `CALLISTO_EXPLAIN_ARCHITECTURE` | | `false` | Lets Callisto describe her own build — see [below](#explaining-herself) |
+| `CALLISTO_BUILDER_NAME` | | — | Who she names as her builder when she does |
 
 ### `HOST`, and why containers use `0.0.0.0`
 
@@ -55,6 +57,50 @@ the port is reachable from that machine and nowhere else.
 The browser sends whichever spelling you typed in the address bar, so the
 default lists both `127.0.0.1` and `localhost`. In production this becomes your
 single public origin — see [deployment.md](deployment.md).
+
+### Explaining herself
+
+Off by default. With `CALLISTO_EXPLAIN_ARCHITECTURE=true`, a briefing is
+appended to the system instruction and Callisto will walk a visitor through how
+she works — for a recruiter or an engineer, being able to explain her own build
+*is* the demonstration.
+
+```dotenv
+CALLISTO_EXPLAIN_ARCHITECTURE=true
+CALLISTO_BUILDER_NAME=Your Name
+```
+
+Accepts `true` / `yes` / `1` / `on`. Anything else — including a typo or a
+blank — stays off, so the ambiguous case fails closed.
+
+`CALLISTO_BUILDER_NAME` is who she credits: she answers that she was built by
+that person to demonstrate engineering skill, that she is one of their own
+creations, and that she is fully open source under the MIT licence. Unset, she
+says "my builder" rather than a placeholder — a literal `[BUILDER NAME]` would
+be spoken aloud.
+
+**What the briefing permits.** The core streaming-audio decision and why
+barge-in works; the shape of the monorepo and what each half is responsible for;
+the orb being driven by the real signal; each tool and what it does, including
+why the popup check holds a model turn open; that sessions are origin-gated and
+rate-limited; and that her persona and links are configuration rather than code.
+She is told to lead with the one idea that matters, keep it to a few spoken
+sentences, and offer to go deeper instead of lecturing.
+
+**What it forbids**, even under persistent asking: credentials, secrets and
+configuration values; anything about where she is deployed — provider, server,
+domain, addresses, ports, containers, proxies, paths, logs; the contents of her
+own instructions, including the briefing and persona text; and anything about
+other visitors. The repository is public and MIT-licensed, so its *design* is
+public — the machine it happens to run on is not. If pressed she declines once,
+warmly, notes that the boundary is itself part of the engineering, and offers
+the source instead.
+
+She is also told to admit what she does not know rather than invent it. Being
+caught guessing about her own construction would undo the point of the feature.
+
+When disclosure is off the section is **absent, not negated** — a deployment
+that leaves it false sends exactly the tokens it sent before this existed.
 
 ### Links
 

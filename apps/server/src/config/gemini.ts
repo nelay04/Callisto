@@ -5,6 +5,7 @@ import {
   type LiveConnectConfig,
 } from '@google/genai';
 import { getSystemPrompt } from '../prompts/callisto.prompt';
+import { renderArchitectureBriefing } from '../prompts/architecture.prompt';
 import { renderLinksForPrompt } from './links';
 import { getOpenUrlDeclaration } from '../tools/openUrl.tool';
 import { sendMailtoDeclaration } from '../tools/mailto.tool';
@@ -29,9 +30,10 @@ export function getGeminiLiveConfig(): LiveConnectConfig {
 
   return {
     responseModalities: [Modality.AUDIO],
-    // The link catalogue is appended rather than folded into the persona, so
-    // CALLISTO_SYSTEM_PROMPT stays purely the operator's own text.
-    systemInstruction: getSystemPrompt() + renderLinksForPrompt(),
+    // The link catalogue and the self-description briefing are appended rather
+    // than folded into the persona, so CALLISTO_SYSTEM_PROMPT stays purely the
+    // operator's own text. Both render to '' when unconfigured.
+    systemInstruction: getSystemPrompt() + renderLinksForPrompt() + renderArchitectureBriefing(),
     inputAudioTranscription: {},
     outputAudioTranscription: {},
     tools: [
