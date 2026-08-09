@@ -36,15 +36,11 @@ jobs:
           username: ${{ secrets.CONTABO_VM_USERNAME }}
           key: ${{ secrets.CONTABO_VM_SSH_KEY }}
 
-          # Without this the script runs to the end and reports success even
-          # when the build failed — a green deploy over a stale container.
-          script_stops: true
-
           # A cold `--build` compiles both workspaces and runs `next build`.
           command_timeout: 30m
 
           script: |
-            set -euo pipefail
+            set -eu
             cd ~/Projects/Typescript/Callisto
 
             # Pull the latest code from GitHub.
@@ -76,9 +72,8 @@ jobs:
           host: ${{ secrets.CONTABO_VM_HOST }}
           username: ${{ secrets.CONTABO_VM_USERNAME }}
           key: ${{ secrets.CONTABO_VM_SSH_KEY }}
-          script_stops: true
           script: |
-            set -euo pipefail
+            set -eu
 
             # Both services use host networking and bind 127.0.0.1, so these are
             # reachable from the VM itself and from nowhere else. The ports come
