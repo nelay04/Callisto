@@ -55,7 +55,7 @@ describe('isServerMessage', () => {
     { type: 'turn_complete' },
     { type: 'error', message: 'boom' },
     { type: 'pong' },
-    { type: 'open_url', url: 'https://github.com/x', contact: 'github' },
+    { type: 'open_url', url: 'https://github.com/x', name: 'github' },
     { type: 'send_mailto', mailtoUrl: 'mailto:a@b.c' },
     { type: 'check_popup' },
   ];
@@ -72,8 +72,8 @@ describe('isServerMessage', () => {
 
   it('rejects open_url without a URL', () => {
     // The client passes `url` to window.open(); an empty value must not reach it.
-    expect(isServerMessage({ type: 'open_url', contact: 'github' })).toBe(false);
-    expect(isServerMessage({ type: 'open_url', url: '', contact: 'github' })).toBe(false);
+    expect(isServerMessage({ type: 'open_url', name: 'github' })).toBe(false);
+    expect(isServerMessage({ type: 'open_url', url: '', name: 'github' })).toBe(false);
   });
 
   it('rejects an error message whose detail is not a string', () => {

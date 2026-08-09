@@ -38,7 +38,7 @@ commit or an image layer.
 | `CORS_ORIGIN` | | `http://127.0.0.1:3012,http://localhost:3012` | Comma-separated; gates CORS **and** WebSocket upgrades |
 | `MAX_SESSIONS_PER_IP` | | `3` | Concurrent Gemini sessions per client IP |
 | `CALLISTO_GREETING` | | *built-in instruction* | What Callisto is told to say on connect — see [below](#greeting-on-connect) |
-| `LINKEDIN_URL` / `GITHUB_URL` | | — | Targets for the `open_url` tool; omit one and Callisto says that profile isn't available |
+| `CALLISTO_LINKS` | | — | Everything the `open_url` tool can open — see [below](#links) |
 
 ### `HOST`, and why containers use `0.0.0.0`
 
@@ -55,6 +55,45 @@ the port is reachable from that machine and nowhere else.
 The browser sends whichever spelling you typed in the address bar, so the
 default lists both `127.0.0.1` and `localhost`. In production this becomes your
 single public origin — see [deployment.md](deployment.md).
+
+### Links
+
+`CALLISTO_LINKS` is every destination Callisto can describe or open — profiles,
+the portfolio site, a CV, a live demo. It replaces the fixed `LINKEDIN_URL` and
+`GITHUB_URL` pair, so adding a destination is an `.env` edit rather than a code
+change.
+
+A **single-line** JSON array. Keep it on one line: the value passes through both
+dotenv and Compose's `env_file` parser, and only `CALLISTO_SYSTEM_PROMPT` is
+quoted for multi-line handling.
+
+```dotenv
+CALLISTO_LINKS=[{"name":"GitHub","description":"Repositories behind the projects","url":"https://github.com/you"},{"name":"Portfolio","description":"The work written up in full","url":"https://you.example"}]
+```
+
+| Field | Meaning |
+|---|---|
+| `name` | What Callisto calls it out loud. Also forms the id the model uses — lowercased, spaces to underscores, so `Portfolio Site` becomes `portfolio_site` |
+| `description` | Why a visitor would want it. Spoken aloud, so write it as a phrase |
+| `url` | Must be `http://` or `https://`. Opened in a new tab, never read aloud |
+
+Keys are matched case-insensitively, so `Name` / `name` / `NAME` all work — the
+value is hand-typed into a file with no schema in front of it.
+
+Two behaviours follow from how it is wired:
+
+- **The model can only name what you configured.** The `open_url` declaration is
+  built per session and its enum is exactly these ids, so an unpublished link
+  cannot be invented. Omit the variable and the tool is withheld entirely rather
+  than offered as a dead end.
+- **Descriptions reach the model twice** — in the tool metadata and as a section
+  appended to the system instruction — so Callisto can talk about a link without
+  being asked to open one. The URLs are only in the tool path; she is told not
+  to recite them.
+
+Malformed input throws at session start with a message naming the offending
+entry, rather than being skipped. A dropped link would otherwise fail silently
+at the exact moment a visitor asks to see the work.
 
 ### Greeting on connect
 
@@ -168,7 +207,7 @@ Her name means \"most beautiful\".
 > parser, because a truncated system prompt has no other visible symptom.
 
 To repurpose the project entirely, rewrite this value and set your own
-`LINKEDIN_URL`, `GITHUB_URL` and `MAILTO_ADDRESS`.
+`CALLISTO_LINKS` and `MAILTO_ADDRESS`.
 
 ---
 

@@ -1,52 +1,47 @@
 import { Type, type FunctionDeclaration } from '@google/genai';
+import { getLinks, resolveLinkUrl } from '../config/links';
 
-/** Profile names the `open_url` tool understands. */
-export const SUPPORTED_CONTACTS = ['linkedin', 'github'] as const;
-
-/**
- * Resolve a contact name to its configured URL, or `undefined` when the profile
- * is unknown or simply not configured.
- *
- * The environment is read on every call rather than at import time, so the
- * result can't depend on whether `dotenv` happened to run before this module
- * was first loaded.
- */
-export function resolveContactUrl(contact: string | undefined): string | undefined {
-  switch (contact?.toLowerCase()) {
-    case 'linkedin':
-      return process.env.LINKEDIN_URL || undefined;
-    case 'github':
-      return process.env.GITHUB_URL || undefined;
-    default:
-      return undefined;
-  }
-}
+export { resolveLinkUrl };
 
 /**
  * Gemini function declaration for the `open_url` tool.
  *
- * The model will invoke this ONLY when the user explicitly asks to open or
- * visit a profile link. It must NOT call this proactively.
+ * Built per session rather than exported as a const, because the destinations
+ * come from `CALLISTO_LINKS` — the enum has to reflect whatever the operator
+ * configured, and constraining it to the real ids is what stops the model
+ * inventing a link that was never published.
+ *
+ * Returns `undefined` when nothing is configured: a function declaration whose
+ * enum is empty gives the model a parameter it cannot legally fill.
  */
-export const openUrlDeclaration: FunctionDeclaration = {
-  name: 'open_url',
-  description:
-    'Opens a professional profile link in a new browser tab on the ' +
-    "user's device. Only call this tool when the user explicitly asks to " +
-    'open, visit, or navigate to a profile link. ' +
-    'If the user asks about profiles without specifying one, ask which ' +
-    'they want before calling this tool. ' +
-    'Supported profiles: linkedin, github. ' +
-    'Before calling this tool, call check_popup to ensure popups are allowed.',
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      contact: {
-        type: Type.STRING,
-        description: 'The profile to open. Must be one of: "linkedin", "github".',
-        enum: [...SUPPORTED_CONTACTS],
+export function getOpenUrlDeclaration(): FunctionDeclaration | undefined {
+  const links = getLinks();
+
+  if (links.length === 0) return undefined;
+
+  const ids = links.map((l) => l.id);
+  const catalogue = links.map((l) => `"${l.id}" (${l.name}: ${l.description})`).join('; ');
+
+  return {
+    name: 'open_url',
+    description:
+      'Opens one of the configured links in a new browser tab on the ' +
+      "user's device. Only call this tool when the user explicitly asks to " +
+      'open, visit, or navigate to a link. ' +
+      'If the user asks about links without specifying one, ask which ' +
+      'they want before calling this tool. ' +
+      `Available: ${catalogue}. ` +
+      'Before calling this tool, call check_popup to ensure popups are allowed.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        name: {
+          type: Type.STRING,
+          description: `Which link to open. Must be one of: ${ids.map((i) => `"${i}"`).join(', ')}.`,
+          enum: ids,
+        },
       },
+      required: ['name'],
     },
-    required: ['contact'],
-  },
-};
+  };
+}

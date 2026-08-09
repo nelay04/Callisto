@@ -102,8 +102,8 @@ export interface PongMessage {
 export interface OpenUrlMessage {
   type: 'open_url';
   url: string;
-  /** Which profile was resolved, e.g. `"github"`. */
-  contact: string;
+  /** Which configured link was resolved, e.g. `"github"`. */
+  name: string;
 }
 
 /** The model invoked `send_mailto`; the client should navigate to `mailtoUrl`. */
@@ -191,7 +191,7 @@ export function isServerMessage(value: unknown): value is ServerMessage {
     case 'error':
       return typeof value.message === 'string';
     case 'open_url':
-      return isNonEmptyString(value.url) && typeof value.contact === 'string';
+      return isNonEmptyString(value.url) && typeof value.name === 'string';
     case 'send_mailto':
       return isNonEmptyString(value.mailtoUrl);
     default:

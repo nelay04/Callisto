@@ -2,7 +2,7 @@ import { GoogleGenAI, type LiveServerMessage, type Session } from '@google/genai
 import type { TranscriptRole } from '@callisto/protocol';
 import { GEMINI_MODEL, getGeminiLiveConfig } from '../config/gemini';
 import { getGreetingPrompt } from '../prompts/callisto.prompt';
-import { resolveContactUrl } from '../tools/openUrl.tool';
+import { resolveLinkUrl } from '../tools/openUrl.tool';
 import { buildMailtoUrl } from '../tools/mailto.tool';
 
 /**
@@ -22,7 +22,7 @@ export class GeminiService {
   public onError: (err: Error) => void = () => {};
   public onClose: () => void = () => {};
   /** Fired when the model calls the open_url tool. Provides the resolved URL. */
-  public onOpenUrl: (url: string, contact: string) => void = () => {};
+  public onOpenUrl: (url: string, name: string) => void = () => {};
   /** Fired when the model calls the send_mailto tool. Provides the full mailto: URL. */
   public onSendMailto: (mailtoUrl: string) => void = () => {};
   /** Fired when the model calls check_popup. Caller must later invoke resolveCheckPopup(). */
@@ -134,20 +134,20 @@ export class GeminiService {
     if (functionCalls?.length) {
       for (const call of functionCalls) {
         if (call.name === 'open_url') {
-          const contact = (call.args as Record<string, string>)?.contact?.toLowerCase();
-          const url = resolveContactUrl(contact);
+          const requested = (call.args as Record<string, string>)?.name;
+          const url = resolveLinkUrl(requested);
 
           this.session?.sendToolResponse({
             functionResponses: [{
               id: call.id,
               name: call.name,
               response: url
-                ? { output: { success: true, opened: contact } }
-                : { output: { success: false, error: `Unknown contact: ${contact}` } },
+                ? { output: { success: true, opened: requested } }
+                : { output: { success: false, error: `Unknown link: ${requested}` } },
             }],
           });
 
-          if (url) this.onOpenUrl(url, contact);
+          if (url) this.onOpenUrl(url, requested);
 
         } else if (call.name === 'send_mailto') {
           const args = call.args as Record<string, string> | undefined ?? {};

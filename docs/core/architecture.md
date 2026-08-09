@@ -20,7 +20,7 @@ Three consequences follow, and they explain most of the code:
 - **The orb is driven by the actual signal.** Volume and a spectral-centroid
   pitch proxy are sampled from both audio graphs at 20 Hz and fed into the
   visualisation — it reacts to *what is being said*, not to a timer.
-- **Tools round-trip through the browser.** The model can open a profile link
+- **Tools round-trip through the browser.** The model can open a configured link
   or draft an email, and one tool (`check_popup`) suspends the model's turn
   until the browser answers. See [Tool calling](#tool-calling).
 
@@ -119,9 +119,15 @@ Callisto exposes three functions to the model, defined in
 
 | Tool | Effect |
 |---|---|
-| `open_url` | Opens a configured profile (`linkedin`, `github`) in a new tab |
+| `open_url` | Opens one of the `CALLISTO_LINKS` destinations in a new tab |
 | `send_mailto` | Opens the user's mail client with a drafted message **to the owner** |
 | `check_popup` | Asks the browser whether popups are currently allowed |
+
+`open_url` is built per session rather than declared once. Its enum comes from
+`CALLISTO_LINKS`, so the destinations the model may name are exactly the ones
+configured — a link cannot be invented, and adding one is an `.env` edit. With
+nothing configured the declaration is withheld entirely, rather than offering a
+tool that can only fail.
 
 `check_popup` is the one worth reading the code for. Everything else resolves
 server-side and returns immediately, but only the browser knows whether

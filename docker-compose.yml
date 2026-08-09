@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
 
     # The same file `npm run dev` reads. Nothing is duplicated into this file:
-    # GEMINI_API_KEY, CORS_ORIGIN, MAX_SESSIONS_PER_IP, the profile links and
+    # GEMINI_API_KEY, CORS_ORIGIN, MAX_SESSIONS_PER_IP, CALLISTO_LINKS and
     # CALLISTO_SYSTEM_PROMPT all arrive from here.
     env_file: apps/server/.env
 

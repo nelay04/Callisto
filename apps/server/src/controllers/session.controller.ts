@@ -54,9 +54,9 @@ export function handleSessionWebSocket(ws: WebSocket): void {
     ws.close();
   };
 
-  gemini.onOpenUrl = (url, contact) => {
-    console.log(`Tool: open_url → ${contact} (${url})`);
-    send(ws, { type: 'open_url', url, contact });
+  gemini.onOpenUrl = (url, name) => {
+    console.log(`Tool: open_url → ${name} (${url})`);
+    send(ws, { type: 'open_url', url, name });
   };
 
   gemini.onSendMailto = (mailtoUrl) => {

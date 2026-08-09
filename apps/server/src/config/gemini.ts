@@ -5,7 +5,8 @@ import {
   type LiveConnectConfig,
 } from '@google/genai';
 import { getSystemPrompt } from '../prompts/callisto.prompt';
-import { openUrlDeclaration } from '../tools/openUrl.tool';
+import { renderLinksForPrompt } from './links';
+import { getOpenUrlDeclaration } from '../tools/openUrl.tool';
 import { sendMailtoDeclaration } from '../tools/mailto.tool';
 import { checkPopupDeclaration } from '../tools/checkPopup.tool';
 
@@ -22,15 +23,21 @@ export const GEMINI_MODEL: string =
  * GEMINI_MODEL.
  */
 export function getGeminiLiveConfig(): LiveConnectConfig {
+  // open_url is omitted entirely when CALLISTO_LINKS is empty — offering a tool
+  // with nothing to open invites the model to promise a link it cannot produce.
+  const openUrl = getOpenUrlDeclaration();
+
   return {
     responseModalities: [Modality.AUDIO],
-    systemInstruction: getSystemPrompt(),
+    // The link catalogue is appended rather than folded into the persona, so
+    // CALLISTO_SYSTEM_PROMPT stays purely the operator's own text.
+    systemInstruction: getSystemPrompt() + renderLinksForPrompt(),
     inputAudioTranscription: {},
     outputAudioTranscription: {},
     tools: [
       {
         functionDeclarations: [
-          openUrlDeclaration,
+          ...(openUrl ? [openUrl] : []),
           sendMailtoDeclaration,
           checkPopupDeclaration,
         ],

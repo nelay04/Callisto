@@ -127,7 +127,7 @@ a portfolio companion.
 
 Her entire personality is one environment variable,
 `CALLISTO_SYSTEM_PROMPT` in `apps/server/.env`. Rewrite it, set your own
-`LINKEDIN_URL`, `GITHUB_URL` and `MAILTO_ADDRESS`, and restart — no recompile
+`CALLISTO_LINKS` and `MAILTO_ADDRESS`, and restart — no recompile
 and no image rebuild. See
 [configuration.md](docs/core/configuration.md#the-system-prompt) for the
 multi-line formatting rules.
