@@ -55,6 +55,9 @@ map $http_upgrade $connection_upgrade {
 
 server {
     listen 443 ssl;
+    # `http2 on;` needs nginx >= 1.25.1. On older builds it fails the config
+    # test with `unknown directive "http2"` — drop this line and write the
+    # listen above as `listen 443 ssl http2;` instead.
     http2 on;
     server_name callisto.example.com;
 
@@ -119,8 +122,23 @@ add a `location /health` restricted to your monitoring source.
 
 ## Matching `.env`
 
-`apps/web/.env` — these are inlined at build time, so **rebuild after changing
-them**:
+`.env` at the **repo root** — this is the one that matters for a container
+deploy. Compose reads it to pass the public URLs into the web image as build
+args, which is the only route by which they reach the browser bundle:
+
+```dotenv
+NEXT_PUBLIC_WS_URL=wss://callisto.example.com/ws/session
+NEXT_PUBLIC_API_URL=https://callisto.example.com
+```
+
+> Setting these in `apps/web/.env` alone is the classic failure here, and it
+> fails quietly: compose injects that file with `env_file:`, which lands in the
+> running container *after* the bundle was built and frozen. The image keeps the
+> loopback defaults, so every visitor's browser dials `ws://127.0.0.1:3013` — on
+> their own machine — and the orb never connects. Nothing in the server logs
+> shows it, because the request never arrives.
+
+`apps/web/.env` — still worth keeping in step, for `npm run dev`:
 
 ```dotenv
 PORT=3012
@@ -162,7 +180,8 @@ optional here. (`http://localhost` is exempt, which is why local dev works.)
 - [ ] Both containers published to `127.0.0.1` only — `docker compose ps`
 - [ ] Firewall allows 80/443 and **not** 3012/3013
 - [ ] `CORS_ORIGIN` is the public `https://` origin, nothing else
-- [ ] `NEXT_PUBLIC_WS_URL` uses `wss://`, and the image was rebuilt after setting it
+- [ ] `NEXT_PUBLIC_WS_URL` uses `wss://` and is set in the **root** `.env`, and the image was rebuilt after setting it
+- [ ] Verified it landed: `curl -s https://your-domain/ | grep -o 'wss://[^"]*'` should show your domain, not `127.0.0.1`
 - [ ] `proxy_read_timeout` raised on `/ws/session`
 - [ ] `X-Forwarded-For` set, so the per-IP cap is per visitor
 - [ ] `GEMINI_API_KEY` set — a missing key crashes the server on the first upgrade

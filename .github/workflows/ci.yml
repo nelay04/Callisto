@@ -84,6 +84,7 @@ jobs:
         run: |
           cp apps/server/.env.example apps/server/.env
           cp apps/web/.env.example apps/web/.env
+          cp .env.example .env
           docker compose -f docker-compose.yml config --quiet
           docker compose -f podman-compose.yml config --quiet
 

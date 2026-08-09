@@ -47,9 +47,11 @@ npm run dev
 
 Open <http://127.0.0.1:3012>, allow microphone access, and start talking.
 
-Prefer containers? Both stacks read those same two `.env` files:
+Prefer containers? Both stacks read those same two `.env` files, plus a root
+`.env` holding the two build-time `NEXT_PUBLIC_*` URLs:
 
 ```bash
+cp .env.example .env     # optional locally; defaults to loopback
 npm run docker:up        # or: npm run podman:up
 ```
 

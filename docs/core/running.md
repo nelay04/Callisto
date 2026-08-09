@@ -19,12 +19,22 @@ Nothing listens on `0.0.0.0` on the host in any mode. Open
 ```bash
 cp apps/server/.env.example apps/server/.env     # then add your GEMINI_API_KEY
 cp apps/web/.env.example    apps/web/.env
+cp .env.example             .env                 # container stacks only
 ```
 
 Each app is configured by exactly one file. There is no `.env.local` or
 `.env.production` variant — the same file feeds npm, Docker and Podman, so
 there is nothing to keep in sync. Only the `.env.example` templates are tracked
 by git; `.env` is ignored and never copied into an image.
+
+The third file is different in kind: the root `.env` is read by *compose*, not
+by either app, and supplies `NEXT_PUBLIC_WS_URL` and `NEXT_PUBLIC_API_URL` as
+**build args**. Next inlines those into the browser bundle at build time, so
+the copies in `apps/web/.env` arrive too late to affect a container image —
+they serve `npm run dev`, where the build happens on the fly. Skip this copy
+and the containers still build, using the loopback defaults in the compose
+files. Both stacks read the same root `.env`; compose looks for it beside the
+compose file and ignores the `-f` filename.
 
 `apps/server/.env` needs a real
 [Gemini API key](https://aistudio.google.com/apikey) before a session will

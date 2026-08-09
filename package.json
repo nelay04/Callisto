@@ -33,5 +33,9 @@
   "devDependencies": {
     "concurrently": "^9.1.2",
     "typescript": "5.9.3"
+  },
+  "overrides": {
+    "postcss": "^8.5.26",
+    "sharp": "^0.35.3"
   }
 }

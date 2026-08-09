@@ -1,17 +1,20 @@
 # Configuration
 
-Every way of running Callisto reads the same two files:
+Every way of running Callisto reads the same two files, plus a third that only
+the container stacks use:
 
 | File | Read by |
 |---|---|
 | `apps/server/.env` | `npm run dev` (dotenv), Docker and Podman (`env_file:`) |
 | `apps/web/.env` | `next build`, the dev/start wrapper, Docker and Podman |
+| `.env` (repo root) | Compose only — supplies build args, never read by an app |
 
 Copy the tracked templates and edit in place:
 
 ```bash
 cp apps/server/.env.example apps/server/.env
 cp apps/web/.env.example    apps/web/.env
+cp .env.example             .env
 ```
 
 There is deliberately no `.env.local`, `.env.development` or `.env.production`
@@ -69,6 +72,13 @@ image must be *rebuilt* to point at a different backend — restarting does
 nothing. They are also the address the **browser** dials, which is why they
 never name a compose service: a container hostname means nothing to a browser.
 
+Being build-time has a consequence for containers that catches people out.
+Compose injects `apps/web/.env` with `env_file:`, which sets it in the running
+container — after the bundle is already built and frozen. So in a container the
+values here **do not reach the browser**; they serve `npm run dev`, where the
+build happens on the fly. The container build takes them from the root `.env`
+instead, as build args. Set both, keep them in step.
+
 ### `PORT` needs a wrapper
 
 Next resolves `--port` from the environment while parsing argv, which happens
@@ -83,7 +93,29 @@ own env loading is what inlines `NEXT_PUBLIC_*`.
 
 ---
 
-## The system prompt
+## `.env` (repo root)
+
+Only the container stacks read this file, and only at build time. It exists
+because `NEXT_PUBLIC_*` must be passed to the web image as build args, and
+compose takes `${...}` interpolation from the project root — not from any
+`env_file:`.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_WS_URL` | `ws://127.0.0.1:3013/ws/session` | Baked into the browser bundle |
+| `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:3013` | Baked into the browser bundle |
+
+Both defaults live in the compose files, so omitting the file entirely still
+builds a working local stack. It matters when the app is not reached over
+loopback — see [deployment.md](deployment.md).
+
+`npm run dev` never reads this file, and neither app reads it at run time.
+
+Docker and Podman share it. Compose looks for `.env` beside the compose file
+rather than deriving a name from `-f`, so `docker-compose.yml` and
+`podman-compose.yml` see identical values. Harmless in practice — the two
+stacks bind the same ports and cannot run at once — but if you need them to
+differ, pass `--env-file <path>` instead of renaming anything.
 
 `CALLISTO_SYSTEM_PROMPT` holds Callisto's entire persona. It lives in the
 environment rather than in TypeScript, so retuning her needs neither a
@@ -124,4 +156,5 @@ Edit `PORT` in that app's `.env`, **and** the matching published port in
 automatically.
 
 If you change the server's port, also update `NEXT_PUBLIC_WS_URL` and
-`NEXT_PUBLIC_API_URL` in `apps/web/.env` and rebuild the web image.
+`NEXT_PUBLIC_API_URL` — in `apps/web/.env` for `npm run dev`, **and** in the
+root `.env` for the images — then rebuild the web image.

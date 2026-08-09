@@ -2,6 +2,7 @@
 #
 #   cp apps/server/.env.example apps/server/.env   # add your Gemini API key
 #   cp apps/web/.env.example    apps/web/.env
+#   cp .env.example             .env               # build args, this file reads it
 #   npm run docker:up
 #
 # Then open http://127.0.0.1:3012
